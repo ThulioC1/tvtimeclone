@@ -13,7 +13,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { TMDBShow } from './tmdb';
+import type { TVShow } from './tvmaze';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ export const updateUserProfile = async (
 
 export const addShowToWatchlist = async (
   uid: string,
-  show: TMDBShow,
+  show: TVShow,
   status: ShowStatus = 'watching'
 ): Promise<void> => {
   const ref = doc(db, 'users', uid, 'userShows', String(show.id));

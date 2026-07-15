@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToUserShows, removeShowFromWatchlist, updateShowStatus, type UserShow, type ShowStatus } from '../lib/firestore';
-import { getPosterUrl } from '../lib/tmdb';
+import { getPosterUrl } from '../lib/tvmaze';
 
 const STATUS_LABELS: Record<ShowStatus, string> = {
   watching: 'Assistindo',

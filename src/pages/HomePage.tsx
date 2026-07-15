@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToUserShows, UserShow } from '../lib/firestore';
-import { getTrendingShows, getPosterUrl, type TMDBShow } from '../lib/tmdb';
+import { getTrendingShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
 
 const StarIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-yellow-400">
@@ -11,7 +11,7 @@ const StarIcon = () => (
   </svg>
 );
 
-const ShowCard = ({ show }: { show: TMDBShow }) => {
+const ShowCard = ({ show }: { show: TVShow }) => {
   const posterUrl = getPosterUrl(show.poster_path);
   return (
     <Link to={`/show/${show.id}`} className="card-hover flex-shrink-0 w-36 group">
@@ -89,8 +89,6 @@ const HomePage: React.FC = () => {
   }, [user]);
 
   const watchingShows = userShows.filter((s) => s.status === 'watching');
-  const tmdbApiMissing = import.meta.env.VITE_TMDB_API_KEY === 'YOUR_TMDB_API_KEY_HERE' ||
-    !import.meta.env.VITE_TMDB_API_KEY;
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -101,17 +99,6 @@ const HomePage: React.FC = () => {
         </h1>
         <p className="text-gray-400 mt-1">Veja o que está rolando no momento</p>
       </div>
-
-      {/* TMDB warning */}
-      {tmdbApiMissing && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 mb-6">
-          <p className="text-yellow-400 text-sm font-medium">⚠️ Chave da API TMDB não configurada</p>
-          <p className="text-yellow-400/70 text-xs mt-1">
-            Adicione sua chave em <code className="bg-dark-600 px-1 rounded">.env.local</code> →{' '}
-            <code className="bg-dark-600 px-1 rounded">VITE_TMDB_API_KEY</code>
-          </p>
-        </div>
-      )}
 
       {/* Currently Watching */}
       {watchingShows.length > 0 && (
@@ -143,30 +130,28 @@ const HomePage: React.FC = () => {
       )}
 
       {/* Trending */}
-      {!tmdbApiMissing && (
-        <section>
-          <h2 className="section-title mb-4">Em alta esta semana</h2>
-          {trendingLoading ? (
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="w-36 flex-shrink-0 rounded-xl overflow-hidden animate-pulse">
-                  <div className="aspect-[2/3] bg-dark-600" />
-                  <div className="p-2 space-y-1">
-                    <div className="h-3 bg-dark-500 rounded w-3/4" />
-                    <div className="h-2 bg-dark-600 rounded w-1/2" />
-                  </div>
+      <section>
+        <h2 className="section-title mb-4">Em alta esta semana</h2>
+        {trendingLoading ? (
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="w-36 flex-shrink-0 rounded-xl overflow-hidden animate-pulse">
+                <div className="aspect-[2/3] bg-dark-600" />
+                <div className="p-2 space-y-1">
+                  <div className="h-3 bg-dark-500 rounded w-3/4" />
+                  <div className="h-2 bg-dark-600 rounded w-1/2" />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-              {trending?.results.slice(0, 10).map((show: TMDBShow) => (
-                <ShowCard key={show.id} show={show} />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+            {trending?.results.slice(0, 10).map((show: TVShow) => (
+              <ShowCard key={show.id} show={show} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 };

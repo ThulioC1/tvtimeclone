@@ -7,9 +7,9 @@ import {
   getSeasonDetails,
   getPosterUrl,
   getBackdropUrl,
-  type TMDBSeason,
-  type TMDBEpisode,
-} from '../lib/tmdb';
+  type TVSeason,
+  type TVEpisode,
+} from '../lib/tvmaze';
 import {
   addShowToWatchlist,
   removeShowFromWatchlist,
@@ -60,7 +60,7 @@ const EpisodeRow = ({
   onToggle,
   toggling,
 }: {
-  episode: TMDBEpisode;
+  episode: TVEpisode;
   watched: boolean;
   onToggle: () => void;
   toggling: boolean;
@@ -114,10 +114,10 @@ const SeasonAccordion = ({
   onToggleEpisode,
   togglingId,
 }: {
-  season: TMDBSeason;
+  season: TVSeason;
   showId: number;
   watchedEpisodes: Set<string>;
-  onToggleEpisode: (episode: TMDBEpisode) => void;
+  onToggleEpisode: (episode: TVEpisode) => void;
   togglingId: string | null;
 }) => {
   const [open, setOpen] = useState(false);
@@ -228,7 +228,7 @@ const ShowDetailPage: React.FC = () => {
     }
   };
 
-  const handleToggleEpisode = async (episode: TMDBEpisode) => {
+  const handleToggleEpisode = async (episode: TVEpisode) => {
     if (!user) return;
     const id = getEpisodeId(episode.season_number, episode.episode_number);
     setTogglingId(id);

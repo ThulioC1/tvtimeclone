@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { searchShows, getPosterUrl, type TMDBShow } from '../lib/tmdb';
+import { searchShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
 import { addShowToWatchlist, getUserShows } from '../lib/firestore';
 
 const useDebounce = (value: string, delay: number) => {
@@ -58,7 +58,7 @@ const SearchPage: React.FC = () => {
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const handleAdd = async (show: TMDBShow) => {
+  const handleAdd = async (show: TVShow) => {
     if (!user || addedIds.has(show.id)) return;
     setAddingId(show.id);
     try {
