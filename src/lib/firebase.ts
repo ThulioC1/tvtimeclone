@@ -23,15 +23,8 @@ export const googleProvider = new GoogleAuthProvider();
 
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// Enable offline persistence so data is cached locally and syncs when reachable.
-let db = getFirestore(app);
-try {
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-  });
-} catch {
-  db = getFirestore(app);
-}
+// Offline persistence temporarily disabled for diagnostics (clearer Firestore errors).
+const db = getFirestore(app);
 
 export { db };
 export default app;
