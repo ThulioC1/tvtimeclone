@@ -56,8 +56,20 @@ const AuthPage: React.FC = () => {
         'auth/invalid-email': 'E-mail inválido.',
         'auth/too-many-requests': 'Muitas tentativas. Tente novamente mais tarde.',
         'auth/invalid-credential': 'E-mail ou senha inválidos.',
+        'auth/unauthorized-domain':
+          'Domínio não autorizado: adicione o domínio do site em Authentication → Settings → Authorized domains no Firebase.',
+        'auth/operation-not-allowed':
+          'Login com Google não habilitado: ative o provedor Google em Authentication → Sign-in method.',
+        'auth/popup-blocked':
+          'O pop-up foi bloqueado pelo navegador. Permita pop-ups e tente de novo.',
+        'auth/popup-closed-by-user': 'Login cancelado.',
+        'auth/invalid-oauth-client-id':
+          'Configuração OAuth do Google inválida no Firebase.',
+        'auth/account-exists-with-different-credential':
+          'Já existe uma conta com este e-mail usando outro método de login.',
       };
-      setError(msg[err.code] || 'Ocorreu um erro. Tente novamente.');
+      setError(msg[err.code] || err?.message || 'Ocorreu um erro. Tente novamente.');
+      console.error('Erro de autenticação:', err);
     } finally {
       setLoading(false);
     }
@@ -69,7 +81,19 @@ const AuthPage: React.FC = () => {
     try {
       await signInWithGoogle();
     } catch (err: any) {
-      setError('Erro ao entrar com Google. Tente novamente.');
+      const msg: Record<string, string> = {
+        'auth/unauthorized-domain':
+          'Domínio não autorizado: adicione o domínio do site em Authentication → Settings → Authorized domains no Firebase.',
+        'auth/operation-not-allowed':
+          'Login com Google não habilitado: ative o provedor Google em Authentication → Sign-in method.',
+        'auth/popup-blocked':
+          'O pop-up foi bloqueado pelo navegador. Permita pop-ups e tente de novo.',
+        'auth/popup-closed-by-user': 'Login cancelado.',
+        'auth/invalid-oauth-client-id':
+          'Configuração OAuth do Google inválida no Firebase.',
+      };
+      setError(msg[err.code] || 'Erro ao entrar com Google. Tente novamente.');
+      console.error('Erro ao entrar com Google:', err);
     } finally {
       setGoogleLoading(false);
     }
