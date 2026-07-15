@@ -33,4 +33,5 @@ try {
   db = getFirestore(app);
 }
 
+export { db };
 export default app;
