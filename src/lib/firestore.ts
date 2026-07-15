@@ -139,9 +139,15 @@ export const subscribeToUserShows = (
 ): Unsubscribe => {
   const ref = collection(db, 'users', uid, 'userShows');
   const q = query(ref, orderBy('addedAt', 'desc'));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => d.data() as UserShow));
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      callback(snap.docs.map((d) => d.data() as UserShow));
+    },
+    (err) => {
+      console.error('Erro ao ler séries do usuário:', err);
+    }
+  );
 };
 
 // ── Episodes ──────────────────────────────────────────────────────────────────
@@ -236,7 +242,13 @@ export const subscribeToWatchedEpisodes = (
   callback: (episodeIds: Set<string>) => void
 ): Unsubscribe => {
   const ref = collection(db, 'users', uid, 'userShows', String(showId), 'episodes');
-  return onSnapshot(ref, (snap) => {
-    callback(new Set(snap.docs.map((d) => d.id)));
-  });
+  return onSnapshot(
+    ref,
+    (snap) => {
+      callback(new Set(snap.docs.map((d) => d.id)));
+    },
+    (err) => {
+      console.error('Erro ao ler episódios assistidos:', err);
+    }
+  );
 };

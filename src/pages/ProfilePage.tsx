@@ -14,7 +14,9 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeToUserShows(user.uid, setShows);
-    getUserProfile(user.uid).then(setProfile);
+    getUserProfile(user.uid)
+      .then(setProfile)
+      .catch((err) => console.error('Erro ao carregar perfil:', err));
     return unsub;
   }, [user]);
 

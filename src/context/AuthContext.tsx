@@ -52,12 +52,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) {
-        await loadProfile(firebaseUser.uid);
-      } else {
+      try {
+        if (firebaseUser) {
+          await loadProfile(firebaseUser.uid);
+        } else {
+          setUserProfile(null);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar perfil:', err);
         setUserProfile(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
     return unsub;
   }, []);

@@ -49,9 +49,11 @@ const SearchPage: React.FC = () => {
   // Load already-added shows
   useEffect(() => {
     if (!user) return;
-    getUserShows(user.uid).then((shows) => {
-      setAddedIds(new Set(shows.map((s) => s.showId)));
-    });
+    getUserShows(user.uid)
+      .then((shows) => {
+        setAddedIds(new Set(shows.map((s) => s.showId)));
+      })
+      .catch((err) => console.error('Erro ao carregar séries adicionadas:', err));
   }, [user]);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
