@@ -59,7 +59,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUserProfile(null);
         }
       } catch (err) {
-        console.error('Erro ao carregar perfil:', err);
+        console.error(
+          'Erro ao carregar perfil (Firestore):',
+          err,
+          '\nVerifique se o banco de dados Firestore foi criado no Firebase Console ' +
+            '(Firestore Database → Create database) e se a API do Firestore está habilitada.'
+        );
         setUserProfile(null);
       } finally {
         setLoading(false);
