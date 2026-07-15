@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { searchShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
@@ -34,6 +34,7 @@ const CheckIcon = () => (
 
 const SearchPage: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
   const [addingId, setAddingId] = useState<number | null>(null);
@@ -64,6 +65,9 @@ const SearchPage: React.FC = () => {
     try {
       await addShowToWatchlist(user.uid, show, 'watching');
       setAddedIds((prev) => new Set([...prev, show.id]));
+      navigate(`/show/${show.id}`);
+    } catch (err) {
+      console.error('Erro ao adicionar série:', err);
     } finally {
       setAddingId(null);
     }

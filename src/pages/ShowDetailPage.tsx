@@ -141,7 +141,7 @@ const SeasonAccordion = ({
         className="w-full flex items-center justify-between p-4 hover:bg-dark-600/30 transition-colors"
       >
         <div className="flex-1 text-left">
-          <p className="font-medium text-white">{season.name}</p>
+          <p className="font-medium text-white">Temporada {season.season_number}</p>
           <p className="text-xs text-gray-400 mt-0.5">
             {season.episode_count} episódios
             {episodes.length > 0 && ` · ${watchedInSeason} assistidos`}
