@@ -107,16 +107,16 @@ const AppLayout: React.FC = () => {
         </div>
 
         {/* ── Bottom Dock (mobile) ───────────────────────────── */}
-        <nav className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-          <div className="flex items-center gap-1 px-2 py-2 rounded-2xl glassmorphism shadow-2xl shadow-black/40 border border-white/5">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 glassmorphism border-t border-dark-400/50 safe-area-bottom">
+          <div className="flex items-stretch justify-around max-w-md mx-auto">
             {navItems.map(({ to, label, Icon, end }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={end}
                 className={({ isActive }) =>
-                  `nav-item relative px-4 py-2 rounded-xl transition-all duration-200 ${
-                    isActive ? 'bg-brand-600/20 text-brand-400' : 'text-gray-400 hover:text-white hover:bg-dark-600/60'
+                  `nav-item flex-1 py-2.5 transition-colors duration-200 ${
+                    isActive ? 'text-brand-400' : 'text-gray-500 hover:text-white'
                   }`
                 }
               >

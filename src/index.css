@@ -96,6 +96,10 @@
 }
 
 @layer utilities {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
   .glassmorphism {
     @apply bg-dark-700/60 backdrop-blur-xl border border-dark-400/50;
   }
