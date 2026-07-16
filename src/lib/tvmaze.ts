@@ -205,15 +205,8 @@ export const getShowDetails = async (showId: number): Promise<TVShow> => {
   );
   const show = normalizeShow(raw);
   // Translate the series overview to PT-BR (best-effort; falls back to English).
-  const [overviewPt, seasonOverviews] = await Promise.all([
-    translateToPtBr(show.overview),
-    Promise.all((show.seasons ?? []).map((s) => translateToPtBr(s.overview))),
-  ]);
-  const seasons = (show.seasons ?? []).map((s, i) => ({
-    ...s,
-    overview: seasonOverviews[i],
-  }));
-  return { ...show, overview: overviewPt, seasons };
+  const overviewPt = await translateToPtBr(show.overview);
+  return { ...show, overview: overviewPt };
 };
 
 export const getSeasonDetails = async (
