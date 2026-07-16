@@ -61,15 +61,18 @@ const AppLayout: React.FC = () => {
               to={to}
               end={end}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${
+                `relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${
                   isActive
-                    ? 'bg-brand-600/20 text-brand-400 border border-brand-600/30'
-                    : 'text-gray-400 hover:text-white hover:bg-dark-600'
+                    ? 'text-white bg-white/[0.04]'
+                    : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-gradient-to-b from-brand-400 to-purple-400" />
+                  )}
                   <Icon filled={isActive} />
                   {label}
                 </>

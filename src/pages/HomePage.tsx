@@ -94,7 +94,7 @@ const HomePage: React.FC = () => {
     <div className="p-4 md:p-6 max-w-4xl mx-auto pb-28 md:pb-0">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white">
+        <h1 className="text-3xl font-extrabold text-white tracking-tight">
           Olá, <span className="gradient-text">{user?.displayName?.split(' ')[0] || 'Usuário'}</span> 👋
         </h1>
         <p className="text-gray-400 mt-1">Veja o que está rolando no momento</p>
@@ -119,14 +119,18 @@ const HomePage: React.FC = () => {
 
       {/* Empty state */}
       {watchingShows.length === 0 && (
-        <div className="card p-8 text-center mb-8">
-          <div className="text-5xl mb-3">📺</div>
-          <p className="text-white font-semibold mb-1">Sua lista está vazia</p>
-          <p className="text-gray-400 text-sm mb-4">Busque séries e adicione à sua lista para começar!</p>
-          <Link to="/search" className="btn-primary inline-flex">
-            Descobrir séries
-          </Link>
-        </div>
+          <div className="card p-8 text-center mb-8">
+            <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-purple-500/20 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+              </svg>
+            </div>
+            <p className="text-white font-semibold mb-1">Sua lista está vazia</p>
+            <p className="text-gray-400 text-sm mb-4">Busque séries e adicione à sua lista para começar!</p>
+            <Link to="/search" className="btn-primary inline-flex">
+              Descobrir séries
+            </Link>
+          </div>
       )}
 
       {/* Trending */}

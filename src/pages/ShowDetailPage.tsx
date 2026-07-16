@@ -288,7 +288,7 @@ const ShowDetailPage: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto">
       {/* Hero */}
-      <div className="relative h-56 md:h-72 overflow-hidden">
+      <div className="relative h-60 md:h-80 overflow-hidden">
         {backdropUrl ? (
           <img
             src={backdropUrl}
@@ -297,21 +297,22 @@ const ShowDetailPage: React.FC = () => {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-dark-600" />
+          <div className="w-full h-full bg-gradient-to-br from-dark-600 to-dark-800" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/50 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-dark-900/70 to-transparent" />
         <button
           onClick={() => navigate(-1)}
-          className="absolute top-4 left-4 bg-dark-800/70 backdrop-blur-sm p-2 rounded-xl text-white hover:bg-dark-700 transition-colors"
+          className="absolute top-4 left-4 bg-dark-900/60 backdrop-blur-md p-2.5 rounded-xl text-white hover:bg-dark-800 transition-colors border border-white/10"
         >
           <BackIcon />
         </button>
       </div>
 
-      <div className="px-4 md:px-6 pb-28 md:pb-10 -mt-16 relative">
+      <div className="px-4 md:px-6 pb-28 md:pb-10 -mt-20 relative">
         <div className="flex gap-4 md:gap-5">
           {/* Poster */}
-          <div className="w-24 h-36 md:w-28 md:h-40 rounded-2xl overflow-hidden bg-dark-600 shrink-0 border-2 border-dark-500 shadow-2xl">
+          <div className="w-28 h-40 md:w-32 md:h-48 rounded-2xl overflow-hidden bg-dark-600 shrink-0 border border-white/10 shadow-2xl shadow-black/60 ring-1 ring-white/5">
             {posterUrl ? (
               <img src={posterUrl} alt={show.name} loading="lazy" className="w-full h-full object-cover" />
             ) : (
@@ -320,8 +321,8 @@ const ShowDetailPage: React.FC = () => {
           </div>
 
           {/* Info */}
-          <div className="pt-14 md:pt-16 flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-white leading-tight">{show.name}</h1>
+          <div className="pt-16 md:pt-20 flex-1 min-w-0">
+            <h1 className="text-2xl md:text-3xl font-extrabold text-white leading-tight tracking-tight drop-shadow">{show.name}</h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-400">
               {show.first_air_date && <span>{new Date(show.first_air_date).getFullYear()}</span>}
               {show.number_of_seasons && <span>{show.number_of_seasons} temp.</span>}

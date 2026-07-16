@@ -131,9 +131,9 @@ const WatchlistPage: React.FC = () => {
             { label: 'Concluídas', value: shows.filter((s) => s.status === 'completed').length },
             { label: 'Abandonadas', value: shows.filter((s) => s.status === 'dropped').length },
           ].map(({ label, value }) => (
-            <div key={label} className="card p-3 text-center">
-              <p className="text-2xl font-bold gradient-text">{value}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">{label}</p>
+            <div key={label} className="card p-3 text-center hover:border-brand-500/40 transition-all duration-300">
+              <p className="text-2xl font-extrabold gradient-text">{value}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{label}</p>
             </div>
           ))}
         </div>
@@ -172,20 +172,24 @@ const WatchlistPage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16">
-          <div className="text-5xl mb-3">📺</div>
-          <p className="text-white font-semibold">
-            {shows.length === 0 ? 'Sua lista está vazia' : 'Nenhuma série nessa categoria'}
-          </p>
-          {shows.length === 0 && (
-            <>
-              <p className="text-gray-400 text-sm mt-1">Busque séries para começar a adicionar!</p>
-              <Link to="/search" className="btn-primary inline-flex mt-4">
-                Buscar séries
-              </Link>
-            </>
-          )}
-        </div>
+          <div className="text-center py-16">
+            <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-purple-500/20 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+              </svg>
+            </div>
+            <p className="text-white font-semibold">
+              {shows.length === 0 ? 'Sua lista está vazia' : 'Nenhuma série nessa categoria'}
+            </p>
+            {shows.length === 0 && (
+              <>
+                <p className="text-gray-400 text-sm mt-1">Busque séries para começar a adicionar!</p>
+                <Link to="/search" className="btn-primary inline-flex mt-4">
+                  Buscar séries
+                </Link>
+              </>
+            )}
+          </div>
       )}
     </div>
   );
