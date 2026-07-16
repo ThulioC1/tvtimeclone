@@ -22,6 +22,7 @@ import {
   type ShowStatus,
   updateShowStatus,
 } from '../lib/firestore';
+import { getYouTubeTrailer } from '../lib/youtube';
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -191,6 +192,7 @@ const ShowDetailPage: React.FC = () => {
   const [userShow, setUserShow] = useState<UserShow | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [trailerId, setTrailerId] = useState<string | null>(null);
 
   const { data: show, isLoading } = useQuery({
     queryKey: ['show', showId],
@@ -207,6 +209,15 @@ const ShowDetailPage: React.FC = () => {
     });
     return () => { unsub1(); unsub2(); };
   }, [user, showId]);
+
+  useEffect(() => {
+    if (!show) return;
+    let cancelled = false;
+    getYouTubeTrailer(show.name).then((id) => {
+      if (!cancelled) setTrailerId(id);
+    });
+    return () => { cancelled = true; };
+  }, [show]);
 
   const handleAddToList = async () => {
     if (!user || !show) return;
@@ -371,6 +382,23 @@ const ShowDetailPage: React.FC = () => {
                 style={{
                   width: `${userShow.totalEpisodes > 0? (userShow.watchedCount / userShow.totalEpisodes) * 100 : 0}%`,
                 }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Trailer */}
+        {trailerId && (
+          <div className="mt-5">
+            <h2 className="section-title mb-2">Trailer</h2>
+            <div className="relative w-full rounded-2xl overflow-hidden bg-dark-600" style={{ paddingTop: '56.25%' }}>
+              <iframe
+                className="absolute inset-0 w-full h-full"
+                src={`https://www.youtube.com/embed/${trailerId}`}
+                title={`Trailer de ${show.name}`}
+                frameBorder={0}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
               />
             </div>
           </div>
