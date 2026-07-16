@@ -153,6 +153,30 @@ const normalizeShow = (raw: RawShow): TVShow => {
   };
 };
 
+// ── Translation (PT-BR) ────────────────────────────────────────────────────────
+// Free, keyless MyMemory API. In-memory cache to avoid re-translating.
+const translationCache = new Map<string, string>();
+
+export const translateToPtBr = async (text: string): Promise<string> => {
+  if (!text.trim()) return text;
+  const cached = translationCache.get(text);
+  if (cached !== undefined) return cached;
+
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+      text
+    )}&langpair=en|pt-BR`;
+    const res = await fetch(url);
+    if (!res.ok) return text;
+    const data = await res.json();
+    const translated: string = data?.responseData?.translatedText ?? text;
+    translationCache.set(text, translated);
+    return translated;
+  } catch {
+    return text;
+  }
+};
+
 // ── Image helpers ──────────────────────────────────────────────────────────────
 // TVMaze already returns absolute image URLs, so these just pass them through.
 
@@ -179,7 +203,17 @@ export const getShowDetails = async (showId: number): Promise<TVShow> => {
   const raw = await fetchJson<RawShow & { _embedded?: { seasons?: RawSeason[] } }>(
     `/shows/${showId}?embed=seasons`
   );
-  return normalizeShow(raw);
+  const show = normalizeShow(raw);
+  // Translate the series overview to PT-BR (best-effort; falls back to English).
+  const [overviewPt, seasonOverviews] = await Promise.all([
+    translateToPtBr(show.overview),
+    Promise.all((show.seasons ?? []).map((s) => translateToPtBr(s.overview))),
+  ]);
+  const seasons = (show.seasons ?? []).map((s, i) => ({
+    ...s,
+    overview: seasonOverviews[i],
+  }));
+  return { ...show, overview: overviewPt, seasons };
 };
 
 export const getSeasonDetails = async (
@@ -191,15 +225,17 @@ export const getSeasonDetails = async (
     .filter((e) => e.season === seasonNumber)
     .sort((a, b) => a.number - b.number)
     .map(normalizeEpisode);
+  const overviews = await Promise.all(seasonEpisodes.map((e) => translateToPtBr(e.overview)));
+  const episodesPt = seasonEpisodes.map((e, i) => ({ ...e, overview: overviews[i] }));
   return {
     id: 0,
     season_number: seasonNumber,
     name: `Temporada ${seasonNumber}`,
-    episode_count: seasonEpisodes.length,
+    episode_count: episodesPt.length,
     poster_path: null,
     air_date: null,
     overview: '',
-    episodes: seasonEpisodes,
+    episodes: episodesPt,
   };
 };
 
