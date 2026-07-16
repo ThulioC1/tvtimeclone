@@ -154,7 +154,7 @@ const normalizeShow = (raw: RawShow): TVShow => {
 };
 
 // ── Translation (PT-BR) ────────────────────────────────────────────────────────
-// Free, keyless MyMemory API. In-memory cache to avoid re-translating.
+// Keyless Google Translate (gtx) endpoint. In-memory cache to avoid re-translating.
 const translationCache = new Map<string, string>();
 
 export const translateToPtBr = async (text: string): Promise<string> => {
@@ -163,13 +163,16 @@ export const translateToPtBr = async (text: string): Promise<string> => {
   if (cached !== undefined) return cached;
 
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(
       text
-    )}&langpair=en|pt-BR`;
+    )}`;
     const res = await fetch(url);
     if (!res.ok) return text;
     const data = await res.json();
-    const translated: string = data?.responseData?.translatedText ?? text;
+    // Response shape: [[["trecho traduzido", "trecho original", ...], ...], ...]
+    const translated: string = Array.isArray(data?.[0])
+      ? data[0].map((part: any[]) => part[0]).join('')
+      : text;
     translationCache.set(text, translated);
     return translated;
   } catch {
