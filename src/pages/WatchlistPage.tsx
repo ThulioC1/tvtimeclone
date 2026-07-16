@@ -119,7 +119,7 @@ const WatchlistPage: React.FC = () => {
   const filtered = activeTab === 'all' ? shows : shows.filter((s) => s.status === activeTab);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto pb-28 md:pb-0">
       <h1 className="page-title mb-6">Minha Lista</h1>
 
       {/* Stats row */}

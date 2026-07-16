@@ -229,14 +229,24 @@ const ShowDetailPage: React.FC = () => {
   };
 
   const handleToggleEpisode = async (episode: TVEpisode) => {
-    if (!user) return;
+    if (!user || !show) return;
     const id = getEpisodeId(episode.season_number, episode.episode_number);
     setTogglingId(id);
     try {
+      // Resolve an effective runtime: episode runtime -> season average -> 30 min default.
+      const season = show.seasons?.find((s) => s.season_number === episode.season_number);
+      const seasonRuns = (season?.episodes ?? [])
+        .map((e) => e.runtime)
+        .filter((r): r is number => typeof r === 'number' && r > 0);
+      const seasonAvg = seasonRuns.length
+        ? Math.round(seasonRuns.reduce((a, b) => a + b, 0) / seasonRuns.length)
+        : 30;
+      const effectiveRuntime = episode.runtime && episode.runtime > 0 ? episode.runtime : seasonAvg;
+
       if (watchedEpisodes.has(id)) {
-        await unmarkEpisodeWatched(user.uid, showId, episode.season_number, episode.episode_number, episode.runtime ?? undefined);
+        await unmarkEpisodeWatched(user.uid, showId, episode.season_number, episode.episode_number, effectiveRuntime);
       } else {
-        await markEpisodeWatched(user.uid, showId, episode.season_number, episode.episode_number, episode.runtime ?? undefined);
+        await markEpisodeWatched(user.uid, showId, episode.season_number, episode.episode_number, effectiveRuntime);
       }
     } finally {
       setTogglingId(null);
@@ -287,10 +297,10 @@ const ShowDetailPage: React.FC = () => {
         </button>
       </div>
 
-      <div className="px-6 pb-10 -mt-16 relative">
-        <div className="flex gap-5">
+      <div className="px-4 md:px-6 pb-28 md:pb-10 -mt-16 relative">
+        <div className="flex gap-4 md:gap-5">
           {/* Poster */}
-          <div className="w-28 h-40 rounded-2xl overflow-hidden bg-dark-600 shrink-0 border-2 border-dark-500 shadow-2xl">
+          <div className="w-24 h-36 md:w-28 md:h-40 rounded-2xl overflow-hidden bg-dark-600 shrink-0 border-2 border-dark-500 shadow-2xl">
             {posterUrl ? (
               <img src={posterUrl} alt={show.name} loading="lazy" className="w-full h-full object-cover" />
             ) : (
@@ -299,7 +309,7 @@ const ShowDetailPage: React.FC = () => {
           </div>
 
           {/* Info */}
-          <div className="pt-16 flex-1 min-w-0">
+          <div className="pt-14 md:pt-16 flex-1 min-w-0">
             <h1 className="text-xl font-bold text-white leading-tight">{show.name}</h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-400">
               {show.first_air_date && <span>{new Date(show.first_air_date).getFullYear()}</span>}

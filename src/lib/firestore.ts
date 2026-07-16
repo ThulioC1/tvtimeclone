@@ -164,11 +164,12 @@ export const markEpisodeWatched = async (
 ): Promise<void> => {
   const episodeId = getEpisodeId(seasonNumber, episodeNumber);
   const ref = doc(db, 'users', uid, 'userShows', String(showId), 'episodes', episodeId);
+  const effectiveRuntime = typeof runtime === 'number' && runtime > 0 ? runtime : 30;
   await setDoc(ref, {
     seasonNumber,
     episodeNumber,
     watchedAt: serverTimestamp(),
-    runtime: runtime ?? null,
+    runtime: effectiveRuntime,
   });
 
   // Update watchedCount and totalWatchMinutes
@@ -183,15 +184,13 @@ export const markEpisodeWatched = async (
   }
 
   // Update user total watch minutes
-  if (runtime) {
-    const userRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-      const profile = userSnap.data() as UserProfile;
-      await updateDoc(userRef, {
-        totalWatchMinutes: (profile.totalWatchMinutes || 0) + runtime,
-      });
-    }
+  const userRef = doc(db, 'users', uid);
+  const userSnap = await getDoc(userRef);
+  if (userSnap.exists()) {
+    const profile = userSnap.data() as UserProfile;
+    await updateDoc(userRef, {
+      totalWatchMinutes: (profile.totalWatchMinutes || 0) + effectiveRuntime,
+    });
   }
 };
 
@@ -206,6 +205,8 @@ export const unmarkEpisodeWatched = async (
   const ref = doc(db, 'users', uid, 'userShows', String(showId), 'episodes', episodeId);
   await deleteDoc(ref);
 
+  const effectiveRuntime = typeof runtime === 'number' && runtime > 0 ? runtime : 30;
+
   const showRef = doc(db, 'users', uid, 'userShows', String(showId));
   const showSnap = await getDoc(showRef);
   if (showSnap.exists()) {
@@ -215,15 +216,13 @@ export const unmarkEpisodeWatched = async (
     });
   }
 
-  if (runtime) {
-    const userRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-      const profile = userSnap.data() as UserProfile;
-      await updateDoc(userRef, {
-        totalWatchMinutes: Math.max(0, (profile.totalWatchMinutes || 0) - runtime),
-      });
-    }
+  const userRef = doc(db, 'users', uid);
+  const userSnap = await getDoc(userRef);
+  if (userSnap.exists()) {
+    const profile = userSnap.data() as UserProfile;
+    await updateDoc(userRef, {
+      totalWatchMinutes: Math.max(0, (profile.totalWatchMinutes || 0) - effectiveRuntime),
+    });
   }
 };
 

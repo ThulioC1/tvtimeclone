@@ -77,7 +77,7 @@ const SearchPage: React.FC = () => {
   const showResults = debouncedQuery.trim().length >= 2;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto pb-28 md:pb-0">
       <h1 className="page-title mb-6">Buscar Séries</h1>
 
       {/* Search input */}

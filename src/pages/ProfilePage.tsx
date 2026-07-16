@@ -52,7 +52,7 @@ const ProfilePage: React.FC = () => {
   const avatarLetter = (userProfile?.displayName || user?.email || 'U')[0].toUpperCase();
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="p-4 md:p-6 max-w-2xl mx-auto pb-28 md:pb-0">
       <h1 className="page-title mb-6">Perfil</h1>
 
       {/* Avatar and name */}

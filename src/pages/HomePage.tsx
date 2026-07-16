@@ -91,7 +91,7 @@ const HomePage: React.FC = () => {
   const watchingShows = userShows.filter((s) => s.status === 'watching');
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto pb-28 md:pb-0">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white">

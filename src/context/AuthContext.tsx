@@ -22,6 +22,8 @@ interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  dbError: string | null;
+  setDbError: (msg: string | null) => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -43,10 +45,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   const loadProfile = async (uid: string) => {
     const profile = await getUserProfile(uid);
     setUserProfile(profile);
+    // Fallback: if Firestore profile is missing/empty name but the auth user has one, sync it.
+    if (auth.currentUser && (!profile || !profile.displayName)) {
+      const fbUser = auth.currentUser;
+      if (fbUser.displayName || fbUser.photoURL) {
+        await updateUserProfile(uid, {
+          ...(fbUser.displayName ? { displayName: fbUser.displayName } : {}),
+          ...(fbUser.photoURL ? { photoURL: fbUser.photoURL } : {}),
+        });
+        const refreshed = await getUserProfile(uid);
+        setUserProfile(refreshed);
+      }
+    }
   };
 
   useEffect(() => {
@@ -66,6 +81,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             '(Firestore Database → Create database) e se a API do Firestore está habilitada.'
         );
         setUserProfile(null);
+        setDbError(
+          'Não foi possível carregar seus dados. Verifique sua conexão ou se o Firestore está ativo no Firebase.'
+        );
       } finally {
         setLoading(false);
       }
@@ -106,7 +124,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resetPassword = async (email: string) => {
-    await sendPasswordResetEmail(auth, email);
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (err: any) {
+      // Avoid account enumeration: never reveal whether the email exists.
+      if (err?.code === 'auth/user-not-found') {
+        return;
+      }
+      throw err;
+    }
   };
 
   const refreshProfile = async () => {
@@ -126,6 +152,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         userProfile,
         loading,
+        dbError,
+        setDbError,
         signIn,
         signUp,
         signInWithGoogle,

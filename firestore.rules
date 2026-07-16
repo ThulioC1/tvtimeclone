@@ -5,15 +5,40 @@ service cloud.firestore {
     // ── Users ──────────────────────────────────────────────────────────────
     // Only the authenticated owner can read/write their own user document.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL'])
+        && request.resource.data.displayName is string
+        && request.resource.data.email is string;
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL'])
+        && request.resource.data.uid == userId;
 
       // ── UserShows (subcollection) ────────────────────────────────────────
       match /userShows/{showId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly([
+            'showId', 'title', 'posterPath', 'backdropPath', 'status',
+            'totalEpisodes', 'totalSeasons', 'watchedCount', 'addedAt', 'lastWatchedAt'
+          ])
+          && request.resource.data.showId is int
+          && request.resource.data.title is string
+          && request.resource.data.status in ['watching', 'completed', 'planning', 'on_hold', 'dropped']
+          && request.resource.data.watchedCount is int
+          && request.resource.data.watchedCount >= 0;
 
         // ── Episodes (sub-subcollection) ─────────────────────────────────
         match /episodes/{episodeId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read: if request.auth != null && request.auth.uid == userId;
+          allow write: if request.auth != null && request.auth.uid == userId
+            && request.resource.data.keys().hasOnly([
+              'seasonNumber', 'episodeNumber', 'runtime', 'watchedAt'
+            ])
+            && request.resource.data.seasonNumber is int
+            && request.resource.data.episodeNumber is int
+            && request.resource.data.watchedAt is timestamp;
         }
       }
     }

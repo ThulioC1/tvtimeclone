@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { AppRouter } from './router/AppRouter';
 import ErrorBoundary from './components/ErrorBoundary';
+import FirestoreErrorBanner from './components/FirestoreErrorBanner';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +23,7 @@ const App: React.FC = () => {
         <BrowserRouter>
           <AuthProvider>
             <div className="dark">
+              <FirestoreErrorBanner />
               <AppRouter />
             </div>
           </AuthProvider>
