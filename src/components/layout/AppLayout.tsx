@@ -50,7 +50,7 @@ const AppLayout: React.FC = () => {
           <div className="p-2 bg-brand-600 rounded-xl text-white">
             <TVIcon />
           </div>
-          <span className="text-xl font-bold gradient-text">TV Time</span>
+          <span className="text-xl font-bold gradient-text">Time to Watch</span>
         </div>
 
         {/* Nav */}

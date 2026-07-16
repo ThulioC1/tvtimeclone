@@ -113,7 +113,7 @@ const AuthPage: React.FC = () => {
           <div className="p-4 bg-brand-600 rounded-2xl text-white mb-4 shadow-lg shadow-brand-900/50">
             <TVIcon />
           </div>
-          <h1 className="text-3xl font-bold gradient-text">TV Time</h1>
+          <h1 className="text-3xl font-bold gradient-text">Time to Watch</h1>
           <p className="text-gray-400 text-sm mt-1">Rastreie o que você assiste</p>
         </div>
 

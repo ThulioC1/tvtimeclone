@@ -1,6 +1,6 @@
 {
-  "name": "TV Time Clone",
-  "short_name": "TV Time",
+  "name": "Time to Watch",
+  "short_name": "Time to Watch",
   "description": "Rastreie séries e episódios que você assiste",
   "lang": "pt-BR",
   "start_url": "/",
