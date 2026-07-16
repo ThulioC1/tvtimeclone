@@ -14,7 +14,7 @@ const StarIcon = () => (
 const ShowCard = ({ show }: { show: TVShow }) => {
   const posterUrl = getPosterUrl(show.poster_path);
   return (
-    <Link to={`/show/${show.id}`} className="card-hover flex-shrink-0 w-36 group">
+    <Link to={`/show/${show.id}`} className="card-hover group block">
       <div className="aspect-[2/3] rounded-xl overflow-hidden bg-dark-600 relative">
         {posterUrl ? (
           <img
@@ -137,9 +137,9 @@ const HomePage: React.FC = () => {
       <section>
         <h2 className="section-title mb-4">Em alta esta semana</h2>
         {trendingLoading ? (
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="w-36 flex-shrink-0 rounded-xl overflow-hidden animate-pulse">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="rounded-xl overflow-hidden animate-pulse">
                 <div className="aspect-[2/3] bg-dark-600" />
                 <div className="p-2 space-y-1">
                   <div className="h-3 bg-dark-500 rounded w-3/4" />
@@ -149,7 +149,7 @@ const HomePage: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
             {trending?.results.slice(0, 10).map((show: TVShow) => (
               <ShowCard key={show.id} show={show} />
             ))}
