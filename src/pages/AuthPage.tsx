@@ -3,12 +3,7 @@ import { useAuth } from '../context/AuthContext';
 
 type AuthTab = 'login' | 'register' | 'forgot';
 
-const TVIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-    <path d="M8 21h8M12 17v4" />
-  </svg>
-);
+const AppLogo = () => <img src="/favicon.svg" alt="Time to Watch" className="w-10 h-10" />;
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5">
@@ -110,8 +105,8 @@ const AuthPage: React.FC = () => {
       <div className="w-full max-w-md relative z-10 animation-slide-up">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="p-4 bg-brand-600 rounded-2xl text-white mb-4 shadow-lg shadow-brand-900/50">
-            <TVIcon />
+          <div className="p-3 bg-dark-700 rounded-2xl border border-white/10 mb-4 shadow-lg shadow-brand-900/30">
+            <AppLogo />
           </div>
           <h1 className="text-3xl font-bold gradient-text">Time to Watch</h1>
           <p className="text-gray-400 text-sm mt-1">Rastreie o que você assiste</p>

@@ -24,12 +24,7 @@ const UserIcon = ({ filled }: { filled?: boolean }) => (
   </svg>
 );
 
-const TVIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-    <path d="M8 21h8M12 17v4" />
-  </svg>
-);
+const AppLogo = () => <img src="/favicon.svg" alt="Time to Watch" className="w-8 h-8" />;
 
 const navItems = [
   { to: '/', label: 'Início', Icon: HomeIcon, end: true },
@@ -48,7 +43,7 @@ const AppLayout: React.FC = () => {
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-6 border-b border-dark-500">
           <div className="p-2 bg-brand-600 rounded-xl text-white">
-            <TVIcon />
+            <AppLogo />
           </div>
           <span className="text-xl font-bold gradient-text">Time to Watch</span>
         </div>
