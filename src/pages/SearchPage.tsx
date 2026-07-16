@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { searchShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
+import { searchShows, getShowDetails, getPosterUrl, type TVShow } from '../lib/tvmaze';
 import { addShowToWatchlist, getUserShows } from '../lib/firestore';
 
 const useDebounce = (value: string, delay: number) => {
@@ -63,7 +63,10 @@ const SearchPage: React.FC = () => {
     if (!user || addedIds.has(show.id)) return;
     setAddingId(show.id);
     try {
-      await addShowToWatchlist(user.uid, show, 'watching');
+      // Fetch full details (with seasons) so totalEpisodes/totalSeasons are accurate.
+      const details = await getShowDetails(show.id);
+      const showToAdd = details.seasons && details.seasons.length > 0 ? details : show;
+      await addShowToWatchlist(user.uid, showToAdd, 'watching');
       setAddedIds((prev) => new Set([...prev, show.id]));
       navigate(`/show/${show.id}`);
     } catch (err) {
