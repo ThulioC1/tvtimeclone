@@ -244,3 +244,13 @@ export const getTrendingShows = async (): Promise<TVSearchResult> => {
 export const getPopularShows = async (): Promise<TVSearchResult> => {
   return getTrendingShows();
 };
+
+// ── Next episode helper ────────────────────────────────────────────────────────
+// Returns all episodes of a show sorted by season then number, used to find the
+// next unwatched episode for the "Up Next" feed.
+export const getAllEpisodesSorted = async (showId: number): Promise<TVEpisode[]> => {
+  const episodes = await fetchJson<RawEpisode[]>(`/shows/${showId}/episodes`);
+  return episodes
+    .sort((a, b) => a.season - b.season || a.number - b.number)
+    .map(normalizeEpisode);
+};
