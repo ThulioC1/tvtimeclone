@@ -8,11 +8,11 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId
         && request.resource.data.uid == userId
-        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'createdAt', 'totalWatchMinutes'])
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'coverURL', 'createdAt', 'totalWatchMinutes'])
         && request.resource.data.displayName is string
         && request.resource.data.email is string;
       allow update: if request.auth != null && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'createdAt', 'totalWatchMinutes'])
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'coverURL', 'createdAt', 'totalWatchMinutes'])
         && request.resource.data.uid == userId;
 
       // ── UserShows (subcollection) ────────────────────────────────────────

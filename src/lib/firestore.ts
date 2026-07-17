@@ -12,7 +12,8 @@ import {
   onSnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from './firebase';
 import type { TVShow } from './tvmaze';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -24,6 +25,7 @@ export interface UserProfile {
   displayName: string;
   email: string;
   photoURL: string | null;
+  coverURL: string | null;
   createdAt: Date;
   totalWatchMinutes: number;
 }
@@ -79,6 +81,14 @@ export const updateUserProfile = async (
 ): Promise<void> => {
   const ref = doc(db, 'users', uid);
   await updateDoc(ref, data as any);
+};
+
+export const updateUserCover = async (uid: string, file: File): Promise<string> => {
+  const storageRef = ref(storage, `users/${uid}/cover`);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  await updateDoc(doc(db, 'users', uid), { coverURL: url });
+  return url;
 };
 
 // ── User Shows ────────────────────────────────────────────────────────────────

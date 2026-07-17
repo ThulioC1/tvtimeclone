@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { subscribeToUserShows, type UserShow } from '../lib/firestore';
+import { subscribeToUserShows, updateUserCover, type UserShow } from '../lib/firestore';
 import { getTrendingShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
 
 const StarIcon = () => (
@@ -82,7 +82,7 @@ const StatCard = ({ value, label }: { value: number | string; label: string }) =
 );
 
 const HomePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [userShows, setUserShows] = useState<UserShow[]>([]);
 
   const { data: trending, isLoading: trendingLoading } = useQuery({
@@ -101,16 +101,72 @@ const HomePage: React.FC = () => {
   const totalWatched = userShows.reduce((sum, s) => sum + s.watchedCount, 0);
   const totalMinutes = (user as any)?.totalWatchMinutes ?? 0;
   const totalHours = Math.floor(totalMinutes / 60);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setCoverUploading(true);
+    try {
+      await updateUserCover(user.uid, file);
+    } catch (err) {
+      console.error('Erro ao enviar capa:', err);
+    } finally {
+      setCoverUploading(false);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    }
+  };
+
+  const avatarLetter = (userProfile?.displayName || user?.displayName || user?.email || 'U')[0].toUpperCase();
+  const coverUrl = userProfile?.coverURL || null;
+  const avatarUrl = userProfile?.photoURL || user?.photoURL || null;
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto pb-28 md:pb-0">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-white tracking-tight">
-          Olá, <span className="gradient-text">{user?.displayName?.split(' ')[0] || 'Usuário'}</span> 👋
-        </h1>
-        <p className="text-gray-400 mt-1">Acompanhe suas séries e descubra novidades</p>
+    <div className="max-w-4xl mx-auto pb-28 md:pb-0">
+      {/* Banner + avatar */}
+      <div className="relative">
+        <div
+          className="h-36 md:h-44 w-full bg-gradient-to-br from-brand-600 via-brand-500 to-purple-600 overflow-hidden cursor-pointer group"
+          onClick={() => coverInputRef.current?.click()}
+          title="Trocar capa"
+        >
+          {coverUrl ? (
+            <img src={coverUrl} alt="Capa" className="w-full h-full object-cover" />
+          ) : null}
+          <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_30%_20%,white,transparent_45%)] group-hover:bg-brand-900/30 transition-colors" />
+          <div className="absolute bottom-2 right-3 text-xs text-white/80 bg-dark-900/50 px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+            {coverUploading ? 'Enviando...' : 'Trocar capa'}
+          </div>
+        </div>
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleCoverChange}
+        />
+
+        <div className="px-4 md:px-6">
+          <div className="-mt-10 md:-mt-12 flex items-end gap-4">
+            <div className="w-20 h-20 md:w-24 md:h-24 rounded-3xl bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-dark-900 shrink-0">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white font-bold text-3xl">{avatarLetter}</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0 pb-1">
+              <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight truncate">
+                Olá, <span className="gradient-text">{user?.displayName?.split(' ')[0] || 'Usuário'}</span> 👋
+              </h1>
+              <p className="text-gray-400 mt-0.5 text-sm">Acompanhe suas séries e descubra novidades</p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <div className="px-4 md:px-6 mt-6">
 
       {/* Quick stats */}
       <div className="grid grid-cols-4 gap-3 mb-8">
@@ -188,6 +244,7 @@ const HomePage: React.FC = () => {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 };
