@@ -140,7 +140,7 @@ const HomePage: React.FC = () => {
           </div>
         </div>
 
-        <div className="px-4 md:px-6">
+        <div className="px-4 md:px-6 relative z-10">
           <div className="-mt-10 md:-mt-12 flex items-end gap-4">
             <div className="w-20 h-20 md:w-24 md:h-24 rounded-3xl bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-dark-900 shrink-0">
               {avatarUrl ? (

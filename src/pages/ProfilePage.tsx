@@ -96,7 +96,7 @@ const ProfilePage: React.FC = () => {
             {shows.length === 0 ? 'Adicione séries para escolher um banner' : 'Trocar banner'}
           </div>
         </div>
-        <div className="px-4 md:px-6">
+        <div className="px-4 md:px-6 relative z-10">
           <div className="-mt-14 md:-mt-16 flex items-end gap-4">
             <div className="w-24 h-24 md:w-28 md:h-28 rounded-3xl bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-dark-900 shrink-0">
               {userProfile?.photoURL || user?.photoURL ? (
