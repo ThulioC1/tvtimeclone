@@ -12,6 +12,32 @@ const StarIcon = () => (
   </svg>
 );
 
+// Deterministic shuffle so the "Recommended" list changes every week
+// but stays stable during the week (seeded by ISO week number).
+const getWeekSeed = (): number => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const day = Math.floor((now.getTime() - start.getTime()) / 86400000);
+  return Math.ceil((day + start.getDay() + 1) / 7);
+};
+
+const seededShuffle = <T,>(arr: T[], seed: number): T[] => {
+  const a = [...arr];
+  let s = seed;
+  const rand = () => {
+    s |= 0;
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 const ShowCard = ({ show }: { show: TVShow }) => {
   const posterUrl = getPosterUrl(show.poster_path);
   return (
@@ -90,6 +116,11 @@ const HomePage: React.FC = () => {
     queryKey: ['trending'],
     queryFn: getTrendingShows,
   });
+
+  const weekSeed = getWeekSeed();
+  const recommended = trending?.results
+    ? seededShuffle(trending.results, weekSeed).slice(0, 10)
+    : [];
 
   useEffect(() => {
     if (!user) return;
@@ -237,7 +268,7 @@ const HomePage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {trending?.results.slice(0, 10).map((show: TVShow) => (
+            {recommended.map((show: TVShow) => (
               <ShowCard key={show.id} show={show} />
             ))}
           </div>
