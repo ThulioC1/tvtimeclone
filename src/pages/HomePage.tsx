@@ -135,7 +135,7 @@ const HomePage: React.FC = () => {
     if (!user) return;
     setLoadingUpNext(true);
     const items: UpNextItem[] = [];
-    for (const show of watchingShows) {
+    for (const show of userShows.filter((s) => s.status === 'watching')) {
       try {
         const watched = await new Promise<Set<string>>((resolve) => {
           const unsub = subscribeToWatchedEpisodes(user.uid, show.showId, (ids) => {
@@ -152,7 +152,7 @@ const HomePage: React.FC = () => {
     }
     setUpNext(items);
     setLoadingUpNext(false);
-  }, [user, watchingShows]);
+  }, [user, userShows]);
 
   useEffect(() => {
     loadUpNext();
