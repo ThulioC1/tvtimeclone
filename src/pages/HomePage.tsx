@@ -99,7 +99,7 @@ const HomePage: React.FC = () => {
   const lists = userShows.filter((s) => s.status !== 'plan_to_watch');
   const favorites = userShows.filter((s) => s.isFavorite);
   const totalWatched = userShows.reduce((sum, s) => sum + s.watchedCount, 0);
-  const totalMinutes = (user as any)?.totalWatchMinutes ?? 0;
+  const totalMinutes = userProfile?.totalWatchMinutes ?? 0;
   const totalHours = Math.floor(totalMinutes / 60);
   const [coverUploading, setCoverUploading] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);

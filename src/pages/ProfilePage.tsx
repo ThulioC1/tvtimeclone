@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getUserProfile, subscribeToUserShows, updateUserCover, type UserShow, type UserProfile } from '../lib/firestore';
+import { subscribeToUserShows, updateUserCover, type UserShow } from '../lib/firestore';
 
 const ProfilePage: React.FC = () => {
   const { user, userProfile, signOut, updateDisplayName } = useAuth();
   const [shows, setShows] = useState<UserShow[]>([]);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [editing, setEditing] = useState(false);
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -16,9 +15,6 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeToUserShows(user.uid, setShows);
-    getUserProfile(user.uid)
-      .then(setProfile)
-      .catch((err) => console.error('Erro ao carregar perfil:', err));
     return unsub;
   }, [user]);
 
@@ -27,7 +23,7 @@ const ProfilePage: React.FC = () => {
   }, [userProfile, user]);
 
   const totalWatched = shows.reduce((sum, s) => sum + s.watchedCount, 0);
-  const totalMinutes = profile?.totalWatchMinutes ?? 0;
+  const totalMinutes = userProfile?.totalWatchMinutes ?? 0;
   const totalHours = Math.floor(totalMinutes / 60);
   const remainingMinutes = totalMinutes % 60;
 
@@ -204,8 +200,8 @@ const ProfilePage: React.FC = () => {
           <div className="flex justify-between">
             <span className="text-gray-400">Membro desde</span>
             <span className="text-white">
-              {profile?.createdAt
-                ? new Date((profile.createdAt as any)?.seconds * 1000).toLocaleDateString('pt-BR')
+              {userProfile?.createdAt
+                ? new Date((userProfile.createdAt as any)?.seconds * 1000).toLocaleDateString('pt-BR')
                 : new Date(user?.metadata.creationTime ?? '').toLocaleDateString('pt-BR')}
             </span>
           </div>
