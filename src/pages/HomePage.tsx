@@ -178,7 +178,7 @@ const HomePage: React.FC = () => {
         </div>
 
         <div className="px-4 md:px-6 relative z-10">
-          <div className="-mt-10 md:-mt-12 flex items-end gap-4">
+          <div className="-mt-10 md:-mt-12 flex items-end">
             <div className="w-20 h-20 md:w-24 md:h-24 rounded-3xl bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-dark-900 shrink-0">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
@@ -186,12 +186,14 @@ const HomePage: React.FC = () => {
                 <span className="text-white font-bold text-3xl">{avatarLetter}</span>
               )}
             </div>
-            <div className="flex-1 min-w-0 pb-1">
-              <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight truncate">
-                Olá, <span className="gradient-text">{user?.displayName?.split(' ')[0] || 'Usuário'}</span> 👋
-              </h1>
-              <p className="text-gray-400 mt-0.5 text-sm">Acompanhe suas séries e descubra novidades</p>
-            </div>
+          </div>
+          <div className="mt-3 md:mt-4">
+            <h1 className="text-xl md:text-3xl font-extrabold text-white tracking-tight leading-tight">
+              Olá, <span className="gradient-text">{user?.displayName?.split(' ')[0] || 'Usuário'}</span> 👋
+            </h1>
+            <p className="text-gray-400 mt-1 text-sm md:text-base leading-snug">
+              Acompanhe suas séries e descubra novidades
+            </p>
           </div>
         </div>
       </div>

@@ -97,7 +97,7 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
         <div className="px-4 md:px-6 relative z-10">
-          <div className="-mt-14 md:-mt-16 flex items-end gap-4">
+          <div className="-mt-14 md:-mt-16 flex items-end">
             <div className="w-24 h-24 md:w-28 md:h-28 rounded-3xl bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-dark-900 shrink-0">
               {userProfile?.photoURL || user?.photoURL ? (
                 <img src={(userProfile?.photoURL || user?.photoURL) ?? ''} alt="avatar" className="w-full h-full object-cover" />
@@ -105,43 +105,43 @@ const ProfilePage: React.FC = () => {
                 <span className="text-white font-bold text-4xl">{avatarLetter}</span>
               )}
             </div>
-            <div className="flex-1 min-w-0 pb-1">
-              {editing ? (
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="input-field flex-1 py-2 text-sm"
-                    placeholder="Seu nome"
-                    onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                    autoFocus
-                  />
-                  <button onClick={handleSave} disabled={saving} className="btn-primary py-2 px-4 text-sm">
-                    {saving ? '...' : 'Salvar'}
-                  </button>
-                  <button onClick={() => setEditing(false)} className="btn-ghost text-sm">
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl md:text-2xl font-extrabold text-white truncate">
-                    {userProfile?.displayName || user?.displayName || 'Usuário'}
-                  </h2>
-                  <button
-                    onClick={() => setEditing(true)}
-                    className="text-gray-400 hover:text-brand-400 transition-colors shrink-0"
-                    title="Editar nome"
-                  >
-                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-              <p className="text-sm text-gray-400 mt-0.5 truncate">{user?.email}</p>
-            </div>
+          </div>
+          <div className="mt-3 md:mt-4">
+            {editing ? (
+              <div className="flex flex-wrap gap-2 items-center">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="input-field flex-1 py-2 text-sm min-w-0"
+                  placeholder="Seu nome"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                  autoFocus
+                />
+                <button onClick={handleSave} disabled={saving} className="btn-primary py-2 px-4 text-sm">
+                  {saving ? '...' : 'Salvar'}
+                </button>
+                <button onClick={() => setEditing(false)} className="btn-ghost text-sm">
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl md:text-2xl font-extrabold text-white truncate">
+                  {userProfile?.displayName || user?.displayName || 'Usuário'}
+                </h2>
+                <button
+                  onClick={() => setEditing(true)}
+                  className="text-gray-400 hover:text-brand-400 transition-colors shrink-0"
+                  title="Editar nome"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            <p className="text-sm text-gray-400 mt-1 truncate">{user?.email}</p>
           </div>
         </div>
       </div>
