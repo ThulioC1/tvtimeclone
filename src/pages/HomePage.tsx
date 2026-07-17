@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { subscribeToUserShows, updateUserCover, type UserShow } from '../lib/firestore';
+import { subscribeToUserShows, setBannerShow, getBannerUrl, type UserShow } from '../lib/firestore';
+import BannerPickerModal from '../components/BannerPickerModal';
 import { getTrendingShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
 
 const StarIcon = () => (
@@ -101,51 +102,43 @@ const HomePage: React.FC = () => {
   const totalWatched = userShows.reduce((sum, s) => sum + s.watchedCount, 0);
   const totalMinutes = userProfile?.totalWatchMinutes ?? 0;
   const totalHours = Math.floor(totalMinutes / 60);
-  const [coverUploading, setCoverUploading] = useState(false);
-  const coverInputRef = useRef<HTMLInputElement>(null);
-
-  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    setCoverUploading(true);
-    try {
-      await updateUserCover(user.uid, file);
-    } catch (err) {
-      console.error('Erro ao enviar capa:', err);
-    } finally {
-      setCoverUploading(false);
-      if (coverInputRef.current) coverInputRef.current.value = '';
-    }
-  };
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [savingBanner, setSavingBanner] = useState(false);
 
   const avatarLetter = (userProfile?.displayName || user?.displayName || user?.email || 'U')[0].toUpperCase();
-  const coverUrl = userProfile?.coverURL || null;
+  const bannerUrl = getBannerUrl(userShows, userProfile?.bannerShowId ?? null);
   const avatarUrl = userProfile?.photoURL || user?.photoURL || null;
+
+  const handlePickBanner = async (showId: number | null) => {
+    if (!user) return;
+    setSavingBanner(true);
+    try {
+      await setBannerShow(user.uid, showId);
+      setPickerOpen(false);
+    } catch (err) {
+      console.error('Erro ao definir banner:', err);
+    } finally {
+      setSavingBanner(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto pb-28 md:pb-0">
       {/* Banner + avatar */}
       <div className="relative">
         <div
-          className="h-36 md:h-44 w-full bg-gradient-to-br from-brand-600 via-brand-500 to-purple-600 overflow-hidden cursor-pointer group"
-          onClick={() => coverInputRef.current?.click()}
-          title="Trocar capa"
+          className="h-36 md:h-44 w-full bg-gradient-to-br from-brand-600 via-brand-500 to-purple-600 overflow-hidden cursor-pointer group relative"
+          onClick={() => setPickerOpen(true)}
+          title="Trocar banner"
         >
-          {coverUrl ? (
-            <img src={coverUrl} alt="Capa" className="w-full h-full object-cover" />
+          {bannerUrl ? (
+            <img src={bannerUrl} alt="Banner" className="w-full h-full object-cover" />
           ) : null}
           <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_30%_20%,white,transparent_45%)] group-hover:bg-brand-900/30 transition-colors" />
           <div className="absolute bottom-2 right-3 text-xs text-white/80 bg-dark-900/50 px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-            {coverUploading ? 'Enviando...' : 'Trocar capa'}
+            {userShows.length === 0 ? 'Adicione séries para escolher um banner' : 'Trocar banner'}
           </div>
         </div>
-        <input
-          ref={coverInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleCoverChange}
-        />
 
         <div className="px-4 md:px-6">
           <div className="-mt-10 md:-mt-12 flex items-end gap-4">
@@ -244,6 +237,15 @@ const HomePage: React.FC = () => {
           </div>
         )}
       </section>
+
+      <BannerPickerModal
+        open={pickerOpen}
+        shows={userShows}
+        currentBannerShowId={userProfile?.bannerShowId ?? null}
+        saving={savingBanner}
+        onClose={() => setPickerOpen(false)}
+        onPick={handlePickBanner}
+      />
       </div>
     </div>
   );

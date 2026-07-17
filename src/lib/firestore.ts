@@ -12,8 +12,7 @@ import {
   onSnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from './firebase';
+import { db } from './firebase';
 import type { TVShow } from './tvmaze';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -26,6 +25,7 @@ export interface UserProfile {
   email: string;
   photoURL: string | null;
   coverURL: string | null;
+  bannerShowId: number | null;
   createdAt: Date;
   totalWatchMinutes: number;
 }
@@ -83,12 +83,18 @@ export const updateUserProfile = async (
   await updateDoc(ref, data as any);
 };
 
-export const updateUserCover = async (uid: string, file: File): Promise<string> => {
-  const storageRef = ref(storage, `users/${uid}/cover`);
-  await uploadBytes(storageRef, file);
-  const url = await getDownloadURL(storageRef);
-  await updateDoc(doc(db, 'users', uid), { coverURL: url });
-  return url;
+export const setBannerShow = async (uid: string, showId: number | null): Promise<void> => {
+  await updateDoc(doc(db, 'users', uid), { bannerShowId: showId });
+};
+
+export const getBannerUrl = (
+  shows: UserShow[],
+  bannerShowId: number | null
+): string | null => {
+  if (bannerShowId == null) return null;
+  const show = shows.find((s) => s.showId === bannerShowId);
+  if (!show) return null;
+  return show.backdropPath || show.posterPath || null;
 };
 
 // ── User Shows ────────────────────────────────────────────────────────────────
