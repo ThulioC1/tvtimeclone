@@ -17,7 +17,7 @@ import {
   unmarkEpisodeWatched,
   markAllEpisodesWatched,
   unmarkAllEpisodesWatched,
-  subscribeToWatchedEpisodes,
+  subscribeToWatchedEpisodeDocs,
   subscribeToUserShows,
   getEpisodeId,
   toggleFavorite,
@@ -61,11 +61,13 @@ const STATUS_LABELS: Record<ShowStatus, string> = {
 const EpisodeRow = ({
   episode,
   watched,
+  watchedAt,
   onToggle,
   toggling,
 }: {
   episode: TVEpisode;
   watched: boolean;
+  watchedAt?: Date | null;
   onToggle: () => void;
   toggling: boolean;
 }) => (
@@ -94,12 +96,23 @@ const EpisodeRow = ({
       <p className={`text-sm font-medium truncate ${watched ? 'line-through text-gray-500' : 'text-white'}`}>
         {episode.episode_number}. {episode.name}
       </p>
-      {episode.air_date && (
-        <p className="text-xs text-gray-500 mt-0.5">
-          {new Date(episode.air_date).toLocaleDateString('pt-BR')}
-          {episode.runtime && ` · ${episode.runtime} min`}
-        </p>
-      )}
+      <p className="text-xs text-gray-500 mt-0.5">
+        {episode.air_date && (
+          <span>
+            {new Date(episode.air_date).toLocaleDateString('pt-BR')}
+            {episode.runtime ? ` · ${episode.runtime} min` : ''}
+          </span>
+        )}
+        {watched && watchedAt && (
+          <span className="text-brand-400/80">
+            {episode.air_date ? ' · ' : ''}Assistido em {watchedAt.getDate().toString().padStart(2, '0')}/{(
+              watchedAt.getMonth() + 1
+            )
+              .toString()
+              .padStart(2, '0')}/{watchedAt.getFullYear()}
+          </span>
+        )}
+      </p>
     </div>
 
     {episode.vote_average > 0 && (
@@ -115,6 +128,7 @@ const SeasonAccordion = ({
   season,
   showId,
   watchedEpisodes,
+  watchedDocs,
   onToggleEpisode,
   togglingId,
   open,
@@ -123,6 +137,7 @@ const SeasonAccordion = ({
   season: TVSeason;
   showId: number;
   watchedEpisodes: Set<string>;
+  watchedDocs: Map<string, { watchedAt: Date | null; runtime?: number }>;
   onToggleEpisode: (episode: TVEpisode) => void;
   togglingId: string | null;
   open: boolean;
@@ -175,6 +190,7 @@ const SeasonAccordion = ({
                   key={ep.id}
                   episode={ep}
                   watched={watchedEpisodes.has(id)}
+                  watchedAt={watchedDocs.get(id)?.watchedAt ?? null}
                   onToggle={() => onToggleEpisode(ep)}
                   toggling={togglingId === id}
                 />
@@ -194,6 +210,7 @@ const ShowDetailPage: React.FC = () => {
   const showId = Number(id);
 
   const [watchedEpisodes, setWatchedEpisodes] = useState<Set<string>>(new Set());
+  const [watchedDocs, setWatchedDocs] = useState<Map<string, { watchedAt: Date | null; runtime?: number }>>(new Map());
   const [userShow, setUserShow] = useState<UserShow | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
@@ -210,7 +227,10 @@ const ShowDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (!user || !showId) return;
-    const unsub1 = subscribeToWatchedEpisodes(user.uid, showId, setWatchedEpisodes);
+    const unsub1 = subscribeToWatchedEpisodeDocs(user.uid, showId, (docs) => {
+      setWatchedDocs(docs);
+      setWatchedEpisodes(new Set(docs.keys()));
+    });
     const unsub2 = subscribeToUserShows(user.uid, (shows) => {
       const found = shows.find((s) => s.showId === showId) ?? null;
       setUserShow(found);
@@ -504,6 +524,7 @@ const ShowDetailPage: React.FC = () => {
                   season={season}
                   showId={showId}
                   watchedEpisodes={watchedEpisodes}
+                  watchedDocs={watchedDocs}
                   onToggleEpisode={handleToggleEpisode}
                   togglingId={togglingId}
                   open={openSeason === season.season_number}

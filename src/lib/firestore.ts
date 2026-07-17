@@ -395,3 +395,33 @@ export const subscribeToWatchedEpisodes = (
     }
   );
 };
+
+export interface WatchedEpisodeDoc {
+  watchedAt: Date | null;
+  runtime?: number;
+}
+
+export const subscribeToWatchedEpisodeDocs = (
+  uid: string,
+  showId: number,
+  callback: (episodes: Map<string, WatchedEpisodeDoc>) => void
+): Unsubscribe => {
+  const ref = collection(db, 'users', uid, 'userShows', String(showId), 'episodes');
+  return onSnapshot(
+    ref,
+    (snap) => {
+      const map = new Map<string, WatchedEpisodeDoc>();
+      snap.docs.forEach((d) => {
+        const data = d.data() as { watchedAt?: any; runtime?: number };
+        map.set(d.id, {
+          watchedAt: data.watchedAt ? (data.watchedAt.toDate ? data.watchedAt.toDate() : new Date(data.watchedAt)) : null,
+          runtime: data.runtime,
+        });
+      });
+      callback(map);
+    },
+    (err) => {
+      console.error('Erro ao ler episódios assistidos:', err);
+    }
+  );
+};

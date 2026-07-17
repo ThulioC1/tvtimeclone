@@ -97,7 +97,13 @@ const HomePage: React.FC = () => {
     return unsub;
   }, [user]);
 
-  const lists = userShows.filter((s) => s.status !== 'plan_to_watch');
+  const lists = userShows
+    .filter((s) => s.status !== 'plan_to_watch' && s.status !== 'completed' && s.watchedCount > 0)
+    .sort((a, b) => {
+      const ta = a.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : 0;
+      const tb = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
+      return tb - ta;
+    });
   const favorites = userShows.filter((s) => s.isFavorite);
   const totalWatched = userShows.reduce((sum, s) => sum + s.watchedCount, 0);
   const totalMinutes = userProfile?.totalWatchMinutes ?? 0;
@@ -179,7 +185,7 @@ const HomePage: React.FC = () => {
         </div>
         {lists.length > 0 ? (
           <div className="space-y-2">
-            {lists.slice(0, 6).map((show) => (
+            {lists.slice(0, 3).map((show) => (
               <ListShowRow key={show.showId} show={show} />
             ))}
           </div>
