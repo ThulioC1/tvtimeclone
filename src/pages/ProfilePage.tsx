@@ -152,26 +152,24 @@ const ProfilePage: React.FC = () => {
       <div className="px-4 md:px-6 mt-4">
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="card p-5">
-          <div className="text-3xl font-bold gradient-text">{shows.length}</div>
-          <div className="text-sm text-gray-400 mt-1">Séries na lista</div>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+        <div className="card p-4 sm:p-5 rounded-2xl">
+          <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{shows.length}</div>
+          <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Séries na lista</div>
         </div>
-        <div className="card p-5">
-          <div className="text-3xl font-bold gradient-text">{totalWatched}</div>
-          <div className="text-sm text-gray-400 mt-1">Episódios assistidos</div>
+        <div className="card p-4 sm:p-5 rounded-2xl">
+          <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{totalWatched}</div>
+          <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Episódios assistidos</div>
         </div>
-        <div className="card p-5">
-          <div className="text-3xl font-bold gradient-text">{totalHours}h</div>
-          <div className="text-sm text-gray-400 mt-1">
-            {remainingMinutes > 0 ? `${remainingMinutes}min ` : ''}assistidas
-          </div>
+        <div className="card p-4 sm:p-5 rounded-2xl">
+          <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{totalHours}h{remainingMinutes > 0 ? ` ${remainingMinutes}min` : ''}</div>
+          <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Tempo assistido</div>
         </div>
-        <div className="card p-5">
-          <div className="text-3xl font-bold gradient-text">
+        <div className="card p-4 sm:p-5 rounded-2xl">
+          <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">
             {shows.filter((s) => s.status === 'completed').length}
           </div>
-          <div className="text-sm text-gray-400 mt-1">Séries concluídas</div>
+          <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Séries concluídas</div>
         </div>
       </div>
 

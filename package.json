@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "backfill:stats": "node scripts/backfill-stats.mjs"
+    "backfill:stats": "node scripts/backfill-stats.mjs",
+    "storage:cors": "node scripts/set-cors.mjs"
   },
   "devDependencies": {
+    "@google-cloud/storage": "^7.21.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",
