@@ -12,7 +12,7 @@ service cloud.firestore {
         && request.resource.data.displayName is string
         && request.resource.data.email is string;
       allow update: if request.auth != null && request.auth.uid == userId
-        && request.resource.data.uid == userId;
+        && (request.resource.data.uid == userId || !request.resource.data.keys().has('uid'));
 
       // ── UserShows (subcollection) ────────────────────────────────────────
       match /userShows/{showId} {
