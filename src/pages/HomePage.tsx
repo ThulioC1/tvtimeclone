@@ -97,7 +97,7 @@ const HomePage: React.FC = () => {
   }, [user]);
 
   const lists = userShows.filter((s) => s.status !== 'plan_to_watch');
-  const favorites = userShows.filter((s) => s.status === 'plan_to_watch');
+  const favorites = userShows.filter((s) => s.isFavorite);
   const totalWatched = userShows.reduce((sum, s) => sum + s.watchedCount, 0);
   const totalMinutes = (user as any)?.totalWatchMinutes ?? 0;
   const totalHours = Math.floor(totalMinutes / 60);

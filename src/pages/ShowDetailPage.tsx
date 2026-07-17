@@ -18,6 +18,7 @@ import {
   subscribeToWatchedEpisodes,
   subscribeToUserShows,
   getEpisodeId,
+  toggleFavorite,
   type UserShow,
   type ShowStatus,
   updateShowStatus,
@@ -193,6 +194,7 @@ const ShowDetailPage: React.FC = () => {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [trailerId, setTrailerId] = useState<string | null>(null);
+  const [isFav, setIsFav] = useState(false);
 
   const { data: show, isLoading } = useQuery({
     queryKey: ['show', showId],
@@ -206,6 +208,7 @@ const ShowDetailPage: React.FC = () => {
     const unsub2 = subscribeToUserShows(user.uid, (shows) => {
       const found = shows.find((s) => s.showId === showId) ?? null;
       setUserShow(found);
+      setIsFav(found?.isFavorite ?? false);
     });
     return () => { unsub1(); unsub2(); };
   }, [user, showId]);
@@ -236,6 +239,17 @@ const ShowDetailPage: React.FC = () => {
       await updateShowStatus(user.uid, showId, status);
     } finally {
       setStatusUpdating(false);
+    }
+  };
+
+  const handleToggleFav = async () => {
+    if (!user) return;
+    const next = !isFav;
+    setIsFav(next);
+    try {
+      await toggleFavorite(user.uid, showId, next);
+    } catch {
+      setIsFav(!next);
     }
   };
 
@@ -341,7 +355,7 @@ const ShowDetailPage: React.FC = () => {
         </div>
 
         {/* Action buttons */}
-        <div className="flex gap-3 mt-5">
+        <div className="flex gap-3 mt-5 items-stretch">
           {!isInList ? (
             <button onClick={handleAddToList} className="btn-primary flex-1">
               + Adicionar à lista
@@ -365,6 +379,22 @@ const ShowDetailPage: React.FC = () => {
                 Remover
               </button>
             </div>
+          )}
+
+          {isInList && (
+            <button
+              onClick={handleToggleFav}
+              className={`shrink-0 w-12 rounded-xl border transition-all duration-200 active:scale-95 flex items-center justify-center ${
+                isFav
+                  ? 'bg-red-500/15 border-red-500/40 text-red-400'
+                  : 'bg-dark-700 border-white/10 text-gray-400 hover:text-red-400 hover:border-red-500/30'
+              }`}
+              title={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+            >
+              <svg viewBox="0 0 24 24" className="w-6 h-6" fill={isFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </button>
           )}
         </div>
 

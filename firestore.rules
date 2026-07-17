@@ -21,7 +21,7 @@ service cloud.firestore {
         allow create, update: if request.auth != null && request.auth.uid == userId
           && request.resource.data.keys().hasOnly([
             'showId', 'title', 'posterPath', 'backdropPath', 'status',
-            'totalEpisodes', 'totalSeasons', 'watchedCount', 'addedAt', 'lastWatchedAt'
+            'totalEpisodes', 'totalSeasons', 'watchedCount', 'addedAt', 'lastWatchedAt', 'isFavorite'
           ])
           && request.resource.data.showId is int
           && request.resource.data.title is string

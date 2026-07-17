@@ -39,6 +39,7 @@ export interface UserShow {
   addedAt: Date;
   lastWatchedAt: Date | null;
   totalSeasons: number;
+  isFavorite: boolean;
 }
 
 export interface WatchedEpisode {
@@ -104,6 +105,7 @@ export const addShowToWatchlist = async (
     watchedCount: 0,
     addedAt: serverTimestamp(),
     lastWatchedAt: null,
+    isFavorite: false,
   } satisfies Omit<UserShow, 'addedAt' | 'lastWatchedAt'> & { addedAt: any; lastWatchedAt: any });
 };
 
@@ -124,6 +126,15 @@ export const updateShowStatus = async (
 ): Promise<void> => {
   const ref = doc(db, 'users', uid, 'userShows', String(showId));
   await updateDoc(ref, { status });
+};
+
+export const toggleFavorite = async (
+  uid: string,
+  showId: number,
+  isFavorite: boolean
+): Promise<void> => {
+  const ref = doc(db, 'users', uid, 'userShows', String(showId));
+  await updateDoc(ref, { isFavorite });
 };
 
 export const getUserShows = async (uid: string): Promise<UserShow[]> => {
