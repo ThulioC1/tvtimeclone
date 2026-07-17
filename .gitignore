@@ -25,6 +25,7 @@ dist-ssr
 
 # Firebase service account (não versionar)
 scripts/serviceAccountKey.json
+scripts/*-firebase-adminsdk-*.json
 
 .vercel
 .env*

@@ -15,6 +15,8 @@ import {
   removeShowFromWatchlist,
   markEpisodeWatched,
   unmarkEpisodeWatched,
+  markAllEpisodesWatched,
+  unmarkAllEpisodesWatched,
   subscribeToWatchedEpisodes,
   subscribeToUserShows,
   getEpisodeId,
@@ -115,15 +117,17 @@ const SeasonAccordion = ({
   watchedEpisodes,
   onToggleEpisode,
   togglingId,
+  open,
+  onToggle,
 }: {
   season: TVSeason;
   showId: number;
   watchedEpisodes: Set<string>;
   onToggleEpisode: (episode: TVEpisode) => void;
   togglingId: string | null;
+  open: boolean;
+  onToggle: () => void;
 }) => {
-  const [open, setOpen] = useState(false);
-
   const { data: seasonData, isLoading } = useQuery({
     queryKey: ['season', showId, season.season_number],
     queryFn: () => getSeasonDetails(showId, season.season_number),
@@ -139,7 +143,7 @@ const SeasonAccordion = ({
   return (
     <div className="card overflow-hidden">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
         className="w-full flex items-center justify-between p-4 hover:bg-dark-600/30 transition-colors"
       >
         <div className="flex-1 text-left">
@@ -195,6 +199,8 @@ const ShowDetailPage: React.FC = () => {
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [trailerId, setTrailerId] = useState<string | null>(null);
   const [isFav, setIsFav] = useState(false);
+  const [openSeason, setOpenSeason] = useState<number | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
 
   const { data: show, isLoading } = useQuery({
     queryKey: ['show', showId],
@@ -277,6 +283,37 @@ const ShowDetailPage: React.FC = () => {
       console.error('Erro ao marcar episódio:', err);
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const allWatched =
+    !!userShow && userShow.totalEpisodes > 0 && userShow.watchedCount >= userShow.totalEpisodes;
+
+  const handleMarkAll = async () => {
+    if (!user || !show) return;
+    setMarkingAll(true);
+    try {
+      const episodes: { seasonNumber: number; episodeNumber: number; runtime?: number | null }[] = [];
+      for (const season of show.seasons ?? []) {
+        if (season.season_number <= 0) continue;
+        const data = await getSeasonDetails(showId, season.season_number);
+        for (const ep of data.episodes ?? []) {
+          episodes.push({
+            seasonNumber: ep.season_number,
+            episodeNumber: ep.episode_number,
+            runtime: ep.runtime ?? null,
+          });
+        }
+      }
+      if (allWatched) {
+        await unmarkAllEpisodesWatched(user.uid, showId);
+      } else {
+        await markAllEpisodesWatched(user.uid, showId, episodes);
+      }
+    } catch (err) {
+      console.error('Erro ao marcar todos os episódios:', err);
+    } finally {
+      setMarkingAll(false);
     }
   };
 
@@ -417,6 +454,17 @@ const ShowDetailPage: React.FC = () => {
                 }}
               />
             </div>
+            <button
+              onClick={handleMarkAll}
+              disabled={markingAll}
+              className="btn-secondary w-full text-sm mt-3 disabled:opacity-50"
+            >
+              {markingAll
+                ? 'Processando...'
+                : allWatched
+                  ? 'Desmarcar todos os episódios'
+                  : '✓ Marcar tudo como assistido'}
+            </button>
           </div>
         )}
 
@@ -458,6 +506,12 @@ const ShowDetailPage: React.FC = () => {
                   watchedEpisodes={watchedEpisodes}
                   onToggleEpisode={handleToggleEpisode}
                   togglingId={togglingId}
+                  open={openSeason === season.season_number}
+                  onToggle={() =>
+                    setOpenSeason((cur) =>
+                      cur === season.season_number ? null : season.season_number
+                    )
+                  }
                 />
               ))}
             </div>
