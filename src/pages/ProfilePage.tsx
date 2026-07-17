@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToUserShows, setBannerShow, getBannerUrl, recalculateUserStats, type UserShow } from '../lib/firestore';
+import { formatWatchTime } from '../lib/format';
 import BannerPickerModal from '../components/BannerPickerModal';
 
 const ProfilePage: React.FC = () => {
@@ -26,8 +27,6 @@ const ProfilePage: React.FC = () => {
 
   const totalWatched = shows.reduce((sum, s) => sum + s.watchedCount, 0);
   const totalMinutes = userProfile?.totalWatchMinutes ?? 0;
-  const totalHours = Math.floor(totalMinutes / 60);
-  const remainingMinutes = totalMinutes % 60;
 
   const handleSave = async () => {
     if (!newName.trim()) return;
@@ -159,7 +158,7 @@ const ProfilePage: React.FC = () => {
           <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Episódios assistidos</div>
         </div>
         <div className="card p-4 sm:p-5 rounded-2xl">
-          <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{totalHours}h{remainingMinutes > 0 ? ` ${remainingMinutes}min` : ''}</div>
+          <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{formatWatchTime(totalMinutes)}</div>
           <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Tempo assistido</div>
         </div>
         <div className="card p-4 sm:p-5 rounded-2xl">

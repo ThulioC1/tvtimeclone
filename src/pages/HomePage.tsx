@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToUserShows, setBannerShow, getBannerUrl, type UserShow } from '../lib/firestore';
+import { formatWatchTime } from '../lib/format';
 import BannerPickerModal from '../components/BannerPickerModal';
 import { getTrendingShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
 
@@ -138,7 +139,6 @@ const HomePage: React.FC = () => {
   const favorites = userShows.filter((s) => s.isFavorite);
   const totalWatched = userShows.reduce((sum, s) => sum + s.watchedCount, 0);
   const totalMinutes = userProfile?.totalWatchMinutes ?? 0;
-  const totalHours = Math.floor(totalMinutes / 60);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [savingBanner, setSavingBanner] = useState(false);
 
@@ -204,7 +204,7 @@ const HomePage: React.FC = () => {
       <div className="grid grid-cols-4 gap-3 mb-8">
         <StatCard value={userShows.length} label="Na lista" />
         <StatCard value={totalWatched} label="Ep. assistidos" />
-        <StatCard value={`${totalHours}h`} label="Assistidas" />
+        <StatCard value={formatWatchTime(totalMinutes)} label="Assistidas" />
         <StatCard value={userShows.filter((s) => s.status === 'completed').length} label="Concluídas" />
       </div>
 
