@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { subscribeToUserShows, updateUserCover, type UserShow } from '../lib/firestore';
+import { subscribeToUserShows, updateUserCover, recalculateUserStats, type UserShow } from '../lib/firestore';
 
 const ProfilePage: React.FC = () => {
   const { user, userProfile, signOut, updateDisplayName } = useAuth();
@@ -10,6 +10,7 @@ const ProfilePage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [recalc, setRecalc] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -48,6 +49,19 @@ const ProfilePage: React.FC = () => {
   };
 
   const avatarLetter = (userProfile?.displayName || user?.email || 'U')[0].toUpperCase();
+
+  const handleRecalc = async () => {
+    if (!user) return;
+    setRecalc(true);
+    try {
+      await recalculateUserStats(user.uid);
+    } catch (err) {
+      console.error('Erro ao recalcular estatísticas:', err);
+      alert('Erro ao recalcular estatísticas.');
+    } finally {
+      setRecalc(false);
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto pb-28 md:pb-0">
@@ -159,6 +173,16 @@ const ProfilePage: React.FC = () => {
           </div>
           <div className="text-sm text-gray-400 mt-1">Séries concluídas</div>
         </div>
+      </div>
+
+      <div className="flex justify-end mb-6">
+        <button
+          onClick={handleRecalc}
+          disabled={recalc}
+          className="btn-secondary text-sm disabled:opacity-50"
+        >
+          {recalc ? 'Recalculando...' : 'Recalcular estatísticas'}
+        </button>
       </div>
 
       {/* Status breakdown */}

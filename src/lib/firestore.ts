@@ -256,6 +256,37 @@ export const getWatchedEpisodes = async (
   return new Set(snap.docs.map((d) => d.id));
 };
 
+export const recalculateUserStats = async (uid: string): Promise<void> => {
+  const showsRef = collection(db, 'users', uid, 'userShows');
+  const showsSnap = await getDocs(showsRef);
+
+  let totalMinutes = 0;
+  const showUpdates: Promise<void>[] = [];
+
+  for (const showDoc of showsSnap.docs) {
+    const showId = showDoc.id;
+    const episodesRef = collection(db, 'users', uid, 'userShows', showId, 'episodes');
+    const episodesSnap = await getDocs(episodesRef);
+
+    let watchedCount = 0;
+    for (const epDoc of episodesSnap.docs) {
+      const ep = epDoc.data() as { runtime?: number };
+      const rt = typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : 30;
+      watchedCount += 1;
+      totalMinutes += rt;
+    }
+
+    const current = showDoc.data() as UserShow;
+    showUpdates.push(
+      updateDoc(showDoc.ref, { watchedCount })
+    );
+    void current;
+  }
+
+  await Promise.all(showUpdates);
+  await updateDoc(doc(db, 'users', uid), { totalWatchMinutes: totalMinutes });
+};
+
 export const subscribeToWatchedEpisodes = (
   uid: string,
   showId: number,
