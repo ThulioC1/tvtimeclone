@@ -15,7 +15,8 @@ import {
   sendPasswordResetEmail,
   updateProfile,
 } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
+import { auth, googleProvider, db } from '../lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { createUserProfile, getUserProfile, type UserProfile, updateUserProfile } from '../lib/firestore';
 
 interface AuthContextType {
@@ -65,10 +66,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let profileUnsub: (() => void) | null = null;
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
+      if (profileUnsub) {
+        profileUnsub();
+        profileUnsub = null;
+      }
       try {
         if (firebaseUser) {
+          // Real-time listener so stats (watch minutes, etc.) update live.
+          profileUnsub = onSnapshot(doc(db, 'users', firebaseUser.uid), (snap) => {
+            if (snap.exists()) setUserProfile(snap.data() as UserProfile);
+          });
           await loadProfile(firebaseUser.uid);
         } else {
           setUserProfile(null);
@@ -88,7 +98,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
       }
     });
-    return unsub;
+    return () => {
+      if (profileUnsub) profileUnsub();
+      unsub();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {

@@ -273,6 +273,8 @@ const ShowDetailPage: React.FC = () => {
       } else {
         await markEpisodeWatched(user.uid, showId, episode.season_number, episode.episode_number, effectiveRuntime);
       }
+    } catch (err) {
+      console.error('Erro ao marcar episódio:', err);
     } finally {
       setTogglingId(null);
     }
