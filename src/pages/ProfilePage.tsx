@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getUserProfile, subscribeToUserShows, type UserShow, type UserProfile } from '../lib/firestore';
+import { getUserProfile, subscribeToUserShows, updateUserCover, type UserShow, type UserProfile } from '../lib/firestore';
 
 const ProfilePage: React.FC = () => {
   const { user, userProfile, signOut, updateDisplayName } = useAuth();
@@ -10,6 +10,8 @@ const ProfilePage: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -55,14 +57,43 @@ const ProfilePage: React.FC = () => {
     <div className="max-w-2xl mx-auto pb-28 md:pb-0">
       {/* Cover + avatar (estilo Facebook) */}
       <div className="relative">
-        <div className="h-40 md:h-52 w-full bg-gradient-to-br from-brand-600 via-brand-500 to-purple-600 overflow-hidden">
-          <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_30%_20%,white,transparent_45%)]" />
+        <div
+          className="h-40 md:h-52 w-full bg-gradient-to-br from-brand-600 via-brand-500 to-purple-600 overflow-hidden cursor-pointer group relative"
+          onClick={() => coverInputRef.current?.click()}
+          title="Trocar capa"
+        >
+          {userProfile?.coverURL && (
+            <img src={userProfile.coverURL} alt="Capa" className="w-full h-full object-cover" />
+          )}
+          <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_30%_20%,white,transparent_45%)] group-hover:bg-brand-900/30 transition-colors" />
+          <div className="absolute bottom-2 right-3 text-xs text-white/90 bg-dark-900/50 px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+            {coverUploading ? 'Enviando...' : 'Trocar capa'}
+          </div>
         </div>
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file || !user) return;
+            setCoverUploading(true);
+            try {
+              await updateUserCover(user.uid, file);
+            } catch (err) {
+              console.error('Erro ao enviar capa:', err);
+            } finally {
+              setCoverUploading(false);
+              if (coverInputRef.current) coverInputRef.current.value = '';
+            }
+          }}
+        />
         <div className="px-4 md:px-6">
           <div className="-mt-14 md:-mt-16 flex items-end gap-4">
             <div className="w-24 h-24 md:w-28 md:h-28 rounded-3xl bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-dark-900 shrink-0">
-              {user?.photoURL ? (
-                <img src={user.photoURL} alt="avatar" className="w-full h-full object-cover" />
+              {userProfile?.photoURL || user?.photoURL ? (
+                <img src={(userProfile?.photoURL || user?.photoURL) ?? ''} alt="avatar" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-white font-bold text-4xl">{avatarLetter}</span>
               )}
