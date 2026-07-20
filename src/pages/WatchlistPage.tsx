@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import {
   subscribeToUserShows,
   removeShowFromWatchlist,
-  updateShowStatus,
   markEpisodeWatched,
   subscribeToWatchedEpisodes,
   getEpisodeId,
@@ -20,11 +19,11 @@ const STATUS_LABELS: Record<ShowStatus, string> = {
   plan_to_watch: 'Quero assistir',
 };
 
-const STATUS_COLORS: Record<ShowStatus, string> = {
-  watching: 'bg-brand-500/20 text-brand-400',
-  completed: 'bg-green-500/20 text-green-400',
-  dropped: 'bg-red-500/20 text-red-400',
-  plan_to_watch: 'bg-yellow-500/20 text-yellow-400',
+const STATUS_SOLID: Record<ShowStatus, string> = {
+  watching: 'bg-brand-600 text-white',
+  completed: 'bg-green-600 text-white',
+  dropped: 'bg-red-600 text-white',
+  plan_to_watch: 'bg-yellow-500 text-dark-900',
 };
 
 interface UpNextItem {
@@ -32,31 +31,33 @@ interface UpNextItem {
   episode: TVEpisode;
 }
 
-const ShowRow = ({
+const ShowCard = ({
   show,
   onRemove,
-  onStatusChange,
 }: {
   show: UserShow;
   onRemove: () => void;
-  onStatusChange: (status: ShowStatus) => void;
 }) => {
-  const posterUrl = getPosterUrl(show.posterPath, 'w185');
-  const progress = show.totalEpisodes > 0 ? (show.watchedCount / show.totalEpisodes) * 100 : 0;
+  const posterUrl = getPosterUrl(show.posterPath, 'w342');
 
   return (
-    <div className="card p-4 flex gap-4 hover:border-brand-500/40 transition-colors active-show-glow">
-      <Link to={`/show/${show.showId}`} className="shrink-0">
-        <div className="w-14 h-20 rounded-xl overflow-hidden bg-dark-500">
+    <div className="card overflow-hidden group hover:border-brand-500/40 transition-colors active-show-glow relative">
+      <Link to={`/show/${show.showId}`} className="block relative">
+        <div className="aspect-[2/3] w-full bg-dark-500 overflow-hidden">
           {posterUrl ? (
-            <img src={posterUrl} alt={show.title} loading="lazy" className="w-full h-full object-cover" />
+            <img src={posterUrl} alt={show.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
           ) : (
             <div className="w-full h-full bg-dark-500" />
           )}
         </div>
+
+        {/* Status banner at the bottom of the poster (solid color) */}
+        <div className={`absolute inset-x-0 bottom-0 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide ${STATUS_SOLID[show.status]}`}>
+          {STATUS_LABELS[show.status]}
+        </div>
       </Link>
 
-      <div className="flex-1 min-w-0">
+      <div className="p-3">
         <div className="flex items-start justify-between gap-2">
           <Link to={`/show/${show.showId}`}>
             <h3 className="font-semibold text-white hover:text-brand-400 transition-colors truncate text-sm">
@@ -71,25 +72,9 @@ const ShowRow = ({
             ×
           </button>
         </div>
-
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <select
-            value={show.status}
-            onChange={(e) => onStatusChange(e.target.value as ShowStatus)}
-            className={`text-xs font-medium px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${STATUS_COLORS[show.status]} bg-transparent`}
-          >
-            {Object.entries(STATUS_LABELS).map(([v, l]) => (
-              <option key={v} value={v} className="bg-dark-700 text-white">{l}</option>
-            ))}
-          </select>
-          <span className="text-xs text-gray-500">
-            {show.watchedCount}/{show.totalEpisodes} ep.
-          </span>
-        </div>
-
-        <div className="progress-bar mt-2">
-          <div className="progress-fill" style={{ width: `${progress}%` }} />
-        </div>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {show.watchedCount}/{show.totalEpisodes} ep.
+        </p>
       </div>
     </div>
   );
@@ -212,11 +197,6 @@ const WatchlistPage: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (showId: number, status: ShowStatus) => {
-    if (!user) return;
-    await updateShowStatus(user.uid, showId, status);
-  };
-
   const tabs = [
     { key: 'upnext' as const, label: 'Up Next' },
     { key: 'list' as const, label: 'Minhas Séries' },
@@ -274,7 +254,7 @@ const WatchlistPage: React.FC = () => {
             </div>
           ) : (
             <div className="text-center py-16">
-              <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-purple-500/20 flex items-center justify-center">
+              <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-500/20 flex items-center justify-center">
                 <svg viewBox="0 0 24 24" className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
@@ -331,20 +311,19 @@ const WatchlistPage: React.FC = () => {
           )}
         </div>
       ) : (
-        <div className="space-y-3 animation-fade-in">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 animation-fade-in">
           {shows.length > 0 ? (
             shows.map((show) => (
               <div key={show.showId} className={removingId === show.showId ? 'opacity-50 pointer-events-none' : ''}>
-                <ShowRow
+                <ShowCard
                   show={show}
                   onRemove={() => handleRemove(show.showId)}
-                  onStatusChange={(s) => handleStatusChange(show.showId, s)}
                 />
               </div>
             ))
           ) : (
             <div className="text-center py-16">
-              <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-purple-500/20 flex items-center justify-center">
+              <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-500/20 flex items-center justify-center">
                 <svg viewBox="0 0 24 24" className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.5}>
                   <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
                 </svg>

@@ -245,6 +245,50 @@ export const getPopularShows = async (): Promise<TVSearchResult> => {
   return getTrendingShows();
 };
 
+// ── Genre-based recommendations ──────────────────────────────────────────────
+// Fetches several pages of shows from TVMaze and prioritizes those whose genres
+// overlap with the user's preferred genres, then fills the rest with other shows.
+export const getRecommendedShows = async (
+  preferredGenres: string[],
+  limit = 20
+): Promise<TVSearchResult> => {
+  const normalizedPrefs = preferredGenres
+    .map((g) => g.toLowerCase().trim())
+    .filter(Boolean);
+  const prefSet = new Set(normalizedPrefs);
+
+  const matched: TVShow[] = [];
+  const others: TVShow[] = [];
+  const seen = new Set<number>();
+
+  // Fetch a handful of pages (each ~240 shows) to get enough variety.
+  const pages = normalizedPrefs.length > 0 ? 6 : 2;
+  for (let page = 0; page < pages && (matched.length + others.length) < limit * 3; page++) {
+    let raw: RawShow[];
+    try {
+      raw = await fetchJson<RawShow[]>(`/shows?page=${page}`);
+    } catch {
+      break;
+    }
+    if (!raw.length) break;
+
+    const shows = raw.map(normalizeShow);
+    for (const show of shows) {
+      if (seen.has(show.id)) continue;
+      seen.add(show.id);
+      const showGenres = (show.genres ?? []).map((g) => g.name.toLowerCase());
+      const isMatch = prefSet.size > 0 && showGenres.some((g) => prefSet.has(g));
+      if (isMatch) matched.push(show);
+      else others.push(show);
+    }
+  }
+
+  const results =
+    matched.length > 0 ? [...matched, ...others] : others;
+  const sliced = results.slice(0, Math.max(limit, 10));
+  return { results: sliced, total_results: sliced.length, total_pages: 1, page: 1 };
+};
+
 // ── Next episode helper ────────────────────────────────────────────────────────
 // Returns all episodes of a show sorted by season then number, used to find the
 // next unwatched episode for the "Up Next" feed.

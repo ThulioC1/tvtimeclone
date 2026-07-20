@@ -43,6 +43,7 @@ export interface UserShow {
   lastWatchedAt: Date | null;
   totalSeasons: number;
   isFavorite: boolean;
+  genres?: string[];
 }
 
 export interface WatchedEpisode {
@@ -123,6 +124,7 @@ export const addShowToWatchlist = async (
     addedAt: serverTimestamp(),
     lastWatchedAt: null,
     isFavorite: false,
+    genres: show.genres?.map((g) => g.name) ?? [],
   } satisfies Omit<UserShow, 'addedAt' | 'lastWatchedAt'> & { addedAt: any; lastWatchedAt: any });
 };
 
@@ -219,6 +221,24 @@ export const markEpisodeWatched = async (
     await updateDoc(userRef, {
       totalWatchMinutes: (profile.totalWatchMinutes || 0) + effectiveRuntime,
     });
+  }
+};
+
+export const setEpisodeWatchedAt = async (
+  uid: string,
+  showId: number,
+  seasonNumber: number,
+  episodeNumber: number,
+  watchedAt: Date
+): Promise<void> => {
+  const episodeId = getEpisodeId(seasonNumber, episodeNumber);
+  const ref = doc(db, 'users', uid, 'userShows', String(showId), 'episodes', episodeId);
+  await updateDoc(ref, { watchedAt });
+
+  const showRef = doc(db, 'users', uid, 'userShows', String(showId));
+  const showSnap = await getDoc(showRef);
+  if (showSnap.exists()) {
+    await updateDoc(showRef, { lastWatchedAt: watchedAt });
   }
 };
 
@@ -346,6 +366,100 @@ export const unmarkAllEpisodesWatched = async (
     });
   }
   await batch.commit();
+};
+
+export const markSeasonWatched = async (
+  uid: string,
+  showId: number,
+  seasonNumber: number,
+  episodes: EpisodeInput[]
+): Promise<void> => {
+  const episodesRef = collection(db, 'users', uid, 'userShows', String(showId), 'episodes');
+  const showRef = doc(db, 'users', uid, 'userShows', String(showId));
+  const userRef = doc(db, 'users', uid);
+
+  const existingSnap = await getDocs(episodesRef);
+  const existingIds = new Set(existingSnap.docs.map((d) => d.id));
+
+  const batch = writeBatch(db);
+  let totalMinutes = 0;
+  let newCount = 0;
+
+  for (const ep of episodes) {
+    if (ep.seasonNumber !== seasonNumber) continue;
+    const id = getEpisodeId(ep.seasonNumber, ep.episodeNumber);
+    if (existingIds.has(id)) continue;
+    const rt = typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : 30;
+    batch.set(doc(episodesRef, id), {
+      seasonNumber: ep.seasonNumber,
+      episodeNumber: ep.episodeNumber,
+      watchedAt: serverTimestamp(),
+      runtime: rt,
+    });
+    totalMinutes += rt;
+    newCount += 1;
+  }
+
+  if (newCount > 0) {
+    const showSnap = await getDoc(showRef);
+    if (showSnap.exists()) {
+      const current = showSnap.data() as UserShow;
+      batch.update(showRef, {
+        watchedCount: current.watchedCount + newCount,
+        lastWatchedAt: serverTimestamp(),
+      });
+    }
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+      const profile = userSnap.data() as UserProfile;
+      batch.update(userRef, {
+        totalWatchMinutes: (profile.totalWatchMinutes || 0) + totalMinutes,
+      });
+    }
+    await batch.commit();
+  }
+};
+
+export const unmarkSeasonWatched = async (
+  uid: string,
+  showId: number,
+  seasonNumber: number
+): Promise<void> => {
+  const episodesRef = collection(db, 'users', uid, 'userShows', String(showId), 'episodes');
+  const showRef = doc(db, 'users', uid, 'userShows', String(showId));
+  const userRef = doc(db, 'users', uid);
+
+  const episodesSnap = await getDocs(episodesRef);
+  const batch = writeBatch(db);
+
+  let totalMinutes = 0;
+  let removedCount = 0;
+  episodesSnap.docs.forEach((d) => {
+    const data = d.data() as { seasonNumber?: number; runtime?: number };
+    if (data.seasonNumber !== seasonNumber) return;
+    const rt = typeof data.runtime === 'number' && data.runtime > 0 ? data.runtime : 30;
+    totalMinutes += rt;
+    removedCount += 1;
+    batch.delete(d.ref);
+  });
+
+  if (removedCount > 0) {
+    const showSnap = await getDoc(showRef);
+    if (showSnap.exists()) {
+      const current = showSnap.data() as UserShow;
+      batch.update(showRef, {
+        watchedCount: Math.max(0, current.watchedCount - removedCount),
+      });
+    }
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+      const profile = userSnap.data() as UserProfile;
+      batch.update(userRef, {
+        totalWatchMinutes: Math.max(0, (profile.totalWatchMinutes || 0) - totalMinutes),
+      });
+    }
+    await batch.commit();
+  }
 };
 
 export const recalculateUserStats = async (uid: string): Promise<void> => {

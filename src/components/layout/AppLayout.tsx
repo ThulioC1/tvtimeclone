@@ -66,7 +66,7 @@ const AppLayout: React.FC = () => {
               {({ isActive }) => (
                 <>
                   {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-gradient-to-b from-brand-400 to-purple-400" />
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-brand-400" />
                   )}
                   <Icon filled={isActive} />
                   {label}

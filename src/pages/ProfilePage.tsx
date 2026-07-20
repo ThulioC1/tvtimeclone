@@ -83,7 +83,7 @@ const ProfilePage: React.FC = () => {
       {/* Cover + avatar (estilo Facebook) */}
       <div className="relative">
         <div
-          className="h-40 md:h-52 w-full bg-gradient-to-br from-brand-600 via-brand-500 to-purple-600 overflow-hidden cursor-pointer group relative"
+          className="h-40 md:h-52 w-full bg-brand-600 overflow-hidden cursor-pointer group relative"
           onClick={() => setPickerOpen(true)}
           title="Trocar banner"
         >
@@ -97,7 +97,7 @@ const ProfilePage: React.FC = () => {
         </div>
         <div className="px-4 md:px-6 relative z-10">
           <div className="-mt-14 md:-mt-16 flex items-end">
-            <div className="w-24 h-24 md:w-28 md:h-28 rounded-3xl bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-dark-900 shrink-0">
+            <div className="w-24 h-24 md:w-28 md:h-28 rounded-3xl bg-brand-500 flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-dark-900 shrink-0">
               {userProfile?.photoURL || user?.photoURL ? (
                 <img src={(userProfile?.photoURL || user?.photoURL) ?? ''} alt="avatar" className="w-full h-full object-cover" />
               ) : (

@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { subscribeToUserShows, setBannerShow, getBannerUrl, type UserShow } from '../lib/firestore';
 import { formatWatchTime } from '../lib/format';
 import BannerPickerModal from '../components/BannerPickerModal';
-import { getTrendingShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
+import { getRecommendedShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
 
 const StarIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-yellow-400">
@@ -113,14 +113,27 @@ const HomePage: React.FC = () => {
   const { user, userProfile } = useAuth();
   const [userShows, setUserShows] = useState<UserShow[]>([]);
 
-  const { data: trending, isLoading: trendingLoading } = useQuery({
-    queryKey: ['trending'],
-    queryFn: getTrendingShows,
+  // Derive the user's preferred genres (by frequency across their shows).
+  const preferredGenres = (() => {
+    const counts = new Map<string, number>();
+    for (const s of userShows) {
+      for (const g of s.genres ?? []) {
+        counts.set(g, (counts.get(g) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([g]) => g);
+  })();
+
+  const { data: recommendedData, isLoading: trendingLoading } = useQuery({
+    queryKey: ['recommended', preferredGenres.join(',')],
+    queryFn: () => getRecommendedShows(preferredGenres, 20),
   });
 
   const weekSeed = getWeekSeed();
-  const recommended = trending?.results
-    ? seededShuffle(trending.results, weekSeed).slice(0, 10)
+  const recommended = recommendedData?.results
+    ? seededShuffle(recommendedData.results, weekSeed).slice(0, 10)
     : [];
 
   useEffect(() => {
@@ -164,7 +177,7 @@ const HomePage: React.FC = () => {
       {/* Banner + avatar */}
       <div className="relative">
         <div
-          className="h-36 md:h-44 w-full bg-gradient-to-br from-brand-600 via-brand-500 to-purple-600 overflow-hidden cursor-pointer group relative"
+          className="h-36 md:h-44 w-full bg-brand-600 overflow-hidden cursor-pointer group relative"
           onClick={() => setPickerOpen(true)}
           title="Trocar banner"
         >
@@ -179,7 +192,7 @@ const HomePage: React.FC = () => {
 
         <div className="px-4 md:px-6 relative z-10">
           <div className="-mt-10 md:-mt-12 flex items-end">
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-3xl bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-dark-900 shrink-0">
+            <div className="w-20 h-20 md:w-24 md:h-24 rounded-3xl bg-brand-500 flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-dark-900 shrink-0">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
               ) : (

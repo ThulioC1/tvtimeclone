@@ -17,6 +17,9 @@ import {
   unmarkEpisodeWatched,
   markAllEpisodesWatched,
   unmarkAllEpisodesWatched,
+  markSeasonWatched,
+  unmarkSeasonWatched,
+  setEpisodeWatchedAt,
   subscribeToWatchedEpisodeDocs,
   subscribeToUserShows,
   getEpisodeId,
@@ -124,22 +127,47 @@ const EpisodeRow = ({
   </div>
 );
 
+const toDateInputValue = (d: Date | null | undefined): string => {
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 const EpisodeModal = ({
   episode,
   watched,
   watchedAt,
   onClose,
   onToggle,
+  onSaveDate,
 }: {
   episode: TVEpisode;
   watched: boolean;
   watchedAt?: Date | null;
   onClose: () => void;
   onToggle: () => void;
+  onSaveDate?: (date: Date) => void;
 }) => {
   const stillUrl = episode.still_path
     ? getPosterUrl(episode.still_path)
     : null;
+  const [dateValue, setDateValue] = useState<string>(toDateInputValue(watchedAt) || toDateInputValue(new Date()));
+  const [savingDate, setSavingDate] = useState(false);
+
+  const handleSaveDate = async () => {
+    if (!dateValue || !onSaveDate) return;
+    const [y, m, d] = dateValue.split('-').map(Number);
+    const date = new Date(y, m - 1, d, 12, 0, 0);
+    setSavingDate(true);
+    try {
+      onSaveDate(date);
+    } finally {
+      setSavingDate(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 animation-fade-in"
@@ -206,6 +234,29 @@ const EpisodeModal = ({
           <p className="text-sm text-gray-300 leading-relaxed">
             {episode.overview ? episode.overview : 'Sem sinopse disponível para este episódio.'}
           </p>
+
+          {watched && (
+            <div className="mt-4 p-3 rounded-xl bg-dark-600/40 border border-dark-500">
+              <label className="text-xs text-gray-400 block mb-1.5">Data em que assistiu</label>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={dateValue}
+                  max={toDateInputValue(new Date())}
+                  onChange={(e) => setDateValue(e.target.value)}
+                  className="input-field flex-1 text-sm py-2"
+                />
+                <button
+                  onClick={handleSaveDate}
+                  disabled={savingDate || !dateValue || !onSaveDate}
+                  className="btn-secondary text-sm px-4 disabled:opacity-50 shrink-0"
+                >
+                  {savingDate ? '...' : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={() => {
               onToggle();
@@ -229,6 +280,8 @@ const SeasonEpisodes = ({
   onToggleEpisode,
   onOpenEpisode,
   togglingId,
+  onMarkSeason,
+  onUnmarkSeason,
 }: {
   showId: number;
   season: TVSeason;
@@ -236,6 +289,8 @@ const SeasonEpisodes = ({
   watchedDocs: Map<string, { watchedAt: Date | null; runtime?: number }>;
   onToggleEpisode: (episode: TVEpisode) => void;
   onOpenEpisode: (episode: TVEpisode) => void;
+  onMarkSeason: (seasonNumber: number) => void;
+  onUnmarkSeason: (seasonNumber: number) => void;
   togglingId: string | null;
 }) => {
   const { data: seasonData, isLoading } = useQuery({
@@ -247,16 +302,34 @@ const SeasonEpisodes = ({
   const watchedInSeason = episodes.filter((ep) =>
     watchedEpisodes.has(getEpisodeId(ep.season_number, ep.episode_number))
   ).length;
+  const seasonComplete = episodes.length > 0 && watchedInSeason === episodes.length;
   const progress = episodes.length > 0 ? (watchedInSeason / episodes.length) * 100 : 0;
 
   return (
     <div className="mt-3 card overflow-hidden">
       <div className="px-4 py-3 border-b border-dark-500">
-        <div className="flex items-center justify-between">
-          <p className="font-medium text-white">Temporada {season.season_number}</p>
-          <span className="text-xs text-gray-400">
-            {watchedInSeason}/{episodes.length} assistidos
-          </span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-medium text-white">Temporada {season.season_number}</p>
+            <span className="text-xs text-gray-400">
+              {watchedInSeason}/{episodes.length} assistidos
+            </span>
+          </div>
+          <button
+            onClick={() =>
+              seasonComplete
+                ? onUnmarkSeason(season.season_number)
+                : onMarkSeason(season.season_number)
+            }
+            disabled={episodes.length === 0}
+            className={`shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 disabled:opacity-40 ${
+              seasonComplete
+                ? 'bg-dark-600 text-gray-300 hover:bg-dark-500'
+                : 'bg-brand-500/15 text-brand-400 hover:bg-brand-500/25'
+            }`}
+          >
+            {seasonComplete ? 'Desmarcar temp.' : '✓ Marcar temp.'}
+          </button>
         </div>
         <div className="progress-bar mt-2">
           <div className="progress-fill" style={{ width: `${progress}%` }} />
@@ -414,13 +487,43 @@ const ShowDetailPage: React.FC = () => {
       }
       if (allWatched) {
         await unmarkAllEpisodesWatched(user.uid, showId);
+        if (userShow?.status === 'completed') {
+          await updateShowStatus(user.uid, showId, 'watching');
+        }
       } else {
         await markAllEpisodesWatched(user.uid, showId, episodes);
+        if (userShow?.status !== 'completed') {
+          await updateShowStatus(user.uid, showId, 'completed');
+        }
       }
     } catch (err) {
       console.error('Erro ao marcar todos os episódios:', err);
     } finally {
       setMarkingAll(false);
+    }
+  };
+
+  const handleMarkSeason = async (seasonNumber: number) => {
+    if (!user || !show) return;
+    try {
+      const data = await getSeasonDetails(showId, seasonNumber);
+      const episodes = (data.episodes ?? []).map((ep) => ({
+        seasonNumber: ep.season_number,
+        episodeNumber: ep.episode_number,
+        runtime: ep.runtime ?? null,
+      }));
+      await markSeasonWatched(user.uid, showId, seasonNumber, episodes);
+    } catch (err) {
+      console.error('Erro ao marcar temporada:', err);
+    }
+  };
+
+  const handleUnmarkSeason = async (seasonNumber: number) => {
+    if (!user) return;
+    try {
+      await unmarkSeasonWatched(user.uid, showId, seasonNumber);
+    } catch (err) {
+      console.error('Erro ao desmarcar temporada:', err);
     }
   };
 
@@ -638,6 +741,8 @@ const ShowDetailPage: React.FC = () => {
                 watchedDocs={watchedDocs}
                 onToggleEpisode={handleToggleEpisode}
                 onOpenEpisode={setOpenEpisode}
+                onMarkSeason={handleMarkSeason}
+                onUnmarkSeason={handleUnmarkSeason}
                 togglingId={togglingId}
               />
             )}
@@ -657,6 +762,16 @@ const ShowDetailPage: React.FC = () => {
             }
             onClose={() => setOpenEpisode(null)}
             onToggle={() => handleToggleEpisode(openEpisode)}
+            onSaveDate={(date) => {
+              if (!user) return;
+              setEpisodeWatchedAt(
+                user.uid,
+                showId,
+                openEpisode.season_number,
+                openEpisode.episode_number,
+                date
+              );
+            }}
           />
         )}
       </div>
