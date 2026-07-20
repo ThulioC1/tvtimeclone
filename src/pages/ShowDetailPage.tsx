@@ -57,21 +57,27 @@ const EpisodeRow = ({
   watched,
   watchedAt,
   onToggle,
+  onOpen,
   toggling,
 }: {
   episode: TVEpisode;
   watched: boolean;
   watchedAt?: Date | null;
   onToggle: () => void;
+  onOpen: () => void;
   toggling: boolean;
 }) => (
   <div
-    className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${
+    onClick={onOpen}
+    className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 cursor-pointer ${
       watched ? 'bg-dark-600/50 opacity-70' : 'hover:bg-dark-600/30'
     }`}
   >
     <button
-      onClick={onToggle}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
       disabled={toggling}
       className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
         watched
@@ -118,12 +124,110 @@ const EpisodeRow = ({
   </div>
 );
 
+const EpisodeModal = ({
+  episode,
+  watched,
+  watchedAt,
+  onClose,
+  onToggle,
+}: {
+  episode: TVEpisode;
+  watched: boolean;
+  watchedAt?: Date | null;
+  onClose: () => void;
+  onToggle: () => void;
+}) => {
+  const stillUrl = episode.still_path
+    ? getPosterUrl(episode.still_path)
+    : null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 animation-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="card w-full max-w-lg rounded-t-3xl sm:rounded-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {stillUrl && (
+          <div className="relative h-44 sm:h-52 w-full bg-dark-600 overflow-hidden">
+            <img src={stillUrl} alt={episode.name} className="w-full h-full object-cover" />
+            <button
+              onClick={onClose}
+              className="absolute top-3 right-3 bg-dark-900/70 backdrop-blur-md p-2 rounded-xl text-white hover:bg-dark-800 transition-colors border border-white/10"
+            >
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+        <div className="p-5">
+          {!stillUrl && (
+            <div className="flex justify-between items-start mb-3">
+              <h3 className="text-lg font-bold text-white pr-2">
+                {episode.episode_number}. {episode.name}
+              </h3>
+              <button
+                onClick={onClose}
+                className="shrink-0 bg-dark-700 p-2 rounded-xl text-gray-400 hover:text-white hover:bg-dark-600 transition-colors"
+              >
+                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {stillUrl && (
+            <h3 className="text-lg font-bold text-white mb-2">
+              {episode.episode_number}. {episode.name}
+            </h3>
+          )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 mb-3">
+            {episode.air_date && (
+              <span>{new Date(episode.air_date).toLocaleDateString('pt-BR')}</span>
+            )}
+            {episode.runtime ? <span>{episode.runtime} min</span> : null}
+            {episode.vote_average > 0 && (
+              <span className="flex items-center gap-1">
+                <StarIcon /> {episode.vote_average.toFixed(1)}
+              </span>
+            )}
+            {watched && watchedAt && (
+              <span className="text-brand-400/80">
+                Assistido em {watchedAt.getDate().toString().padStart(2, '0')}/{(
+                  watchedAt.getMonth() + 1
+                )
+                  .toString()
+                  .padStart(2, '0')}/{watchedAt.getFullYear()}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-300 leading-relaxed">
+            {episode.overview ? episode.overview : 'Sem sinopse disponível para este episódio.'}
+          </p>
+          <button
+            onClick={() => {
+              onToggle();
+              onClose();
+            }}
+            className={`btn-primary w-full text-sm mt-5 ${watched ? 'bg-dark-600 hover:bg-dark-500' : ''}`}
+          >
+            {watched ? 'Desmarcar como assistido' : '✓ Marcar como assistido'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SeasonEpisodes = ({
   showId,
   season,
   watchedEpisodes,
   watchedDocs,
   onToggleEpisode,
+  onOpenEpisode,
   togglingId,
 }: {
   showId: number;
@@ -131,6 +235,7 @@ const SeasonEpisodes = ({
   watchedEpisodes: Set<string>;
   watchedDocs: Map<string, { watchedAt: Date | null; runtime?: number }>;
   onToggleEpisode: (episode: TVEpisode) => void;
+  onOpenEpisode: (episode: TVEpisode) => void;
   togglingId: string | null;
 }) => {
   const { data: seasonData, isLoading } = useQuery({
@@ -173,6 +278,7 @@ const SeasonEpisodes = ({
                 watched={watchedEpisodes.has(id)}
                 watchedAt={watchedDocs.get(id)?.watchedAt ?? null}
                 onToggle={() => onToggleEpisode(ep)}
+                onOpen={() => onOpenEpisode(ep)}
                 toggling={togglingId === id}
               />
             );
@@ -198,6 +304,7 @@ const ShowDetailPage: React.FC = () => {
   const [isFav, setIsFav] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [openEpisode, setOpenEpisode] = useState<TVEpisode | null>(null);
 
   const { data: show, isLoading } = useQuery({
     queryKey: ['show', showId],
@@ -530,10 +637,27 @@ const ShowDetailPage: React.FC = () => {
                 watchedEpisodes={watchedEpisodes}
                 watchedDocs={watchedDocs}
                 onToggleEpisode={handleToggleEpisode}
+                onOpenEpisode={setOpenEpisode}
                 togglingId={togglingId}
               />
             )}
           </div>
+        )}
+
+        {openEpisode && (
+          <EpisodeModal
+            episode={openEpisode}
+            watched={watchedEpisodes.has(
+              getEpisodeId(openEpisode.season_number, openEpisode.episode_number)
+            )}
+            watchedAt={
+              watchedDocs.get(
+                getEpisodeId(openEpisode.season_number, openEpisode.episode_number)
+              )?.watchedAt ?? null
+            }
+            onClose={() => setOpenEpisode(null)}
+            onToggle={() => handleToggleEpisode(openEpisode)}
+          />
         )}
       </div>
     </div>
