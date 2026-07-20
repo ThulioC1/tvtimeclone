@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToUserShows, setBannerShow, getBannerUrl, type UserShow } from '../lib/firestore';
-import { formatWatchTime } from '../lib/format';
+import { formatWatchTimeShort } from '../lib/format';
 import BannerPickerModal from '../components/BannerPickerModal';
 import { getRecommendedShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
 
@@ -103,9 +103,9 @@ const ListShowRow = ({ show }: { show: UserShow }) => {
 };
 
 const StatCard = ({ value, label }: { value: number | string; label: string }) => (
-  <div className="card p-4 text-center">
-    <p className="text-2xl font-extrabold gradient-text">{value}</p>
-    <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{label}</p>
+  <div className="card p-2.5 sm:p-4 flex flex-col items-center justify-center text-center min-w-0">
+    <p className="text-lg sm:text-2xl font-extrabold gradient-text leading-none break-words w-full">{value}</p>
+    <p className="text-[9px] sm:text-[10px] text-gray-400 mt-1 leading-tight break-words w-full">{label}</p>
   </div>
 );
 
@@ -217,7 +217,7 @@ const HomePage: React.FC = () => {
       <div className="grid grid-cols-4 gap-3 mb-8">
         <StatCard value={userShows.length} label="Na lista" />
         <StatCard value={totalWatched} label="Ep. assistidos" />
-        <StatCard value={formatWatchTime(totalMinutes)} label="Assistidas" />
+        <StatCard value={formatWatchTimeShort(totalMinutes)} label="Assistidas" />
         <StatCard value={userShows.filter((s) => s.status === 'completed').length} label="Concluídas" />
       </div>
 

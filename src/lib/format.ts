@@ -36,3 +36,19 @@ export const formatWatchTime = (totalMinutes: number): string => {
   if (remainingMonths === 0) return `${totalYears} ${totalYears === 1 ? 'ano' : 'anos'}`;
   return `${totalYears}a ${remainingMonths}m`;
 };
+
+// Compact variant for small stat cards: once there are full days watched,
+// show only the days (e.g. "5 dias") to save horizontal space.
+export const formatWatchTimeShort = (totalMinutes: number): string => {
+  if (!totalMinutes || totalMinutes <= 0) return '0min';
+  const totalHours = Math.floor(totalMinutes / MINUTES_PER_HOUR);
+  const minutes = totalMinutes % MINUTES_PER_HOUR;
+
+  if (totalHours < 24) {
+    if (totalHours === 0) return `${minutes}min`;
+    return minutes > 0 ? `${totalHours}h ${minutes}min` : `${totalHours}h`;
+  }
+
+  const totalDays = Math.floor(totalHours / HOURS_PER_DAY);
+  return `${totalDays} ${totalDays === 1 ? 'dia' : 'dias'}`;
+};
