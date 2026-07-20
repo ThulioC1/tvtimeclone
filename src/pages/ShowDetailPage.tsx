@@ -33,14 +33,8 @@ const BackIcon = () => (
   </svg>
 );
 
-const ChevronIcon = ({ open }: { open: boolean }) => (
-  <svg
-    viewBox="0 0 24 24"
-    className={`w-5 h-5 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-  >
+const ChevronDownIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
   </svg>
 );
@@ -124,29 +118,24 @@ const EpisodeRow = ({
   </div>
 );
 
-const SeasonAccordion = ({
-  season,
+const SeasonEpisodes = ({
   showId,
+  season,
   watchedEpisodes,
   watchedDocs,
   onToggleEpisode,
   togglingId,
-  open,
-  onToggle,
 }: {
-  season: TVSeason;
   showId: number;
+  season: TVSeason;
   watchedEpisodes: Set<string>;
   watchedDocs: Map<string, { watchedAt: Date | null; runtime?: number }>;
   onToggleEpisode: (episode: TVEpisode) => void;
   togglingId: string | null;
-  open: boolean;
-  onToggle: () => void;
 }) => {
   const { data: seasonData, isLoading } = useQuery({
     queryKey: ['season', showId, season.season_number],
     queryFn: () => getSeasonDetails(showId, season.season_number),
-    enabled: open,
   });
 
   const episodes = seasonData?.episodes ?? [];
@@ -156,49 +145,40 @@ const SeasonAccordion = ({
   const progress = episodes.length > 0 ? (watchedInSeason / episodes.length) * 100 : 0;
 
   return (
-    <div className="card overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-dark-600/30 transition-colors"
-      >
-        <div className="flex-1 text-left">
+    <div className="mt-3 card overflow-hidden">
+      <div className="px-4 py-3 border-b border-dark-500">
+        <div className="flex items-center justify-between">
           <p className="font-medium text-white">Temporada {season.season_number}</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {season.episode_count} episódios
-            {episodes.length > 0 && ` · ${watchedInSeason} assistidos`}
-          </p>
-          {episodes.length > 0 && (
-            <div className="progress-bar mt-2 w-48">
-              <div className="progress-fill" style={{ width: `${progress}%` }} />
-            </div>
-          )}
+          <span className="text-xs text-gray-400">
+            {watchedInSeason}/{episodes.length} assistidos
+          </span>
         </div>
-        <ChevronIcon open={open} />
-      </button>
+        <div className="progress-bar mt-2">
+          <div className="progress-fill" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
 
-      {open && (
-        <div className="border-t border-dark-500 px-3 py-2 space-y-1 animation-fade-in">
-          {isLoading ? (
-            <div className="py-4 flex justify-center">
-              <span className="w-5 h-5 border-2 border-dark-400 border-t-brand-500 rounded-full animate-spin" />
-            </div>
-          ) : (
-            episodes.map((ep) => {
-              const id = getEpisodeId(ep.season_number, ep.episode_number);
-              return (
-                <EpisodeRow
-                  key={ep.id}
-                  episode={ep}
-                  watched={watchedEpisodes.has(id)}
-                  watchedAt={watchedDocs.get(id)?.watchedAt ?? null}
-                  onToggle={() => onToggleEpisode(ep)}
-                  toggling={togglingId === id}
-                />
-              );
-            })
-          )}
-        </div>
-      )}
+      <div className="px-3 py-2 space-y-1 animation-fade-in">
+        {isLoading ? (
+          <div className="py-4 flex justify-center">
+            <span className="w-5 h-5 border-2 border-dark-400 border-t-brand-500 rounded-full animate-spin" />
+          </div>
+        ) : (
+          episodes.map((ep) => {
+            const id = getEpisodeId(ep.season_number, ep.episode_number);
+            return (
+              <EpisodeRow
+                key={ep.id}
+                episode={ep}
+                watched={watchedEpisodes.has(id)}
+                watchedAt={watchedDocs.get(id)?.watchedAt ?? null}
+                onToggle={() => onToggleEpisode(ep)}
+                toggling={togglingId === id}
+              />
+            );
+          })
+        )}
+      </div>
     </div>
   );
 };
@@ -216,7 +196,7 @@ const ShowDetailPage: React.FC = () => {
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [trailerId, setTrailerId] = useState<string | null>(null);
   const [isFav, setIsFav] = useState(false);
-  const [openSeason, setOpenSeason] = useState<number | null>(null);
+  const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
 
   const { data: show, isLoading } = useQuery({
@@ -357,6 +337,13 @@ const ShowDetailPage: React.FC = () => {
   const posterUrl = getPosterUrl(show.poster_path, 'w342');
   const seasons = show.seasons?.filter((s) => s.season_number > 0) ?? [];
   const isInList = !!userShow;
+
+  const activeSeasonNumber =
+    selectedSeason ?? seasons[0]?.season_number ?? null;
+  const activeSeason =
+    activeSeasonNumber != null
+      ? seasons.find((s) => s.season_number === activeSeasonNumber) ?? null
+      : null;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -517,25 +504,35 @@ const ShowDetailPage: React.FC = () => {
         {seasons.length > 0 && (
           <div className="mt-6">
             <h2 className="section-title mb-3">Temporadas</h2>
-            <div className="space-y-3">
-              {seasons.map((season) => (
-                <SeasonAccordion
-                  key={season.id}
-                  season={season}
-                  showId={showId}
-                  watchedEpisodes={watchedEpisodes}
-                  watchedDocs={watchedDocs}
-                  onToggleEpisode={handleToggleEpisode}
-                  togglingId={togglingId}
-                  open={openSeason === season.season_number}
-                  onToggle={() =>
-                    setOpenSeason((cur) =>
-                      cur === season.season_number ? null : season.season_number
-                    )
-                  }
-                />
-              ))}
+
+            <div className="relative">
+              <select
+                value={activeSeasonNumber ?? ''}
+                onChange={(e) => setSelectedSeason(Number(e.target.value))}
+                className="input-field w-full text-sm py-2.5 pr-10 appearance-none cursor-pointer"
+              >
+                {seasons.map((season) => (
+                  <option key={season.id} value={season.season_number}>
+                    Temporada {season.season_number}
+                    {season.episode_count ? ` · ${season.episode_count} eps` : ''}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                <ChevronDownIcon />
+              </div>
             </div>
+
+            {activeSeason && (
+              <SeasonEpisodes
+                showId={showId}
+                season={activeSeason}
+                watchedEpisodes={watchedEpisodes}
+                watchedDocs={watchedDocs}
+                onToggleEpisode={handleToggleEpisode}
+                togglingId={togglingId}
+              />
+            )}
           </div>
         )}
       </div>
