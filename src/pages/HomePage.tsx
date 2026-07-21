@@ -6,6 +6,7 @@ import { subscribeToUserShows, setBannerShow, getBannerUrl, type UserShow } from
 import { formatWatchTimeShort } from '../lib/format';
 import BannerPickerModal from '../components/BannerPickerModal';
 import { getRecommendedShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
+import { getRecommendedMovies, type MovieDetails } from '../lib/omdb';
 
 const StarIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-yellow-400">
@@ -75,6 +76,44 @@ const ShowCard = ({ show }: { show: TVShow }) => {
   );
 };
 
+const MovieCard = ({ movie }: { movie: MovieDetails }) => {
+  const posterUrl = movie.Poster !== 'N/A' ? movie.Poster : null;
+  return (
+    <Link to={`/movie/${movie.imdbID}`} className="card-hover group block">
+      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-dark-600 relative">
+        {posterUrl ? (
+          <img
+            src={posterUrl}
+            alt={movie.Title}
+            loading="lazy"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.classList.add('flex', 'items-center', 'justify-center'); }}
+          />
+        ) : null}
+        {!posterUrl && (
+          <div className="absolute inset-0 flex items-center justify-center text-gray-600">
+            <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth={1}>
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+            </svg>
+          </div>
+        )}
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-dark-900/80 rounded-full px-2 py-0.5">
+          <StarIcon />
+          <span className="text-[10px] text-white font-medium">
+            {movie.imdbRating !== 'N/A' ? parseFloat(movie.imdbRating).toFixed(1) : '–'}
+          </span>
+        </div>
+      </div>
+      <div className="p-2">
+        <p className="text-xs font-medium text-white truncate">{movie.Title}</p>
+        <p className="text-[10px] text-gray-500">
+          {movie.Year !== 'N/A' ? movie.Year : ''}
+        </p>
+      </div>
+    </Link>
+  );
+};
+
 const ListShowRow = ({ show }: { show: UserShow }) => {
   const posterUrl = getPosterUrl(show.posterPath);
   const progress = show.totalEpisodes > 0 ? (show.watchedCount / show.totalEpisodes) * 100 : 0;
@@ -129,6 +168,12 @@ const HomePage: React.FC = () => {
   const { data: recommendedData, isLoading: trendingLoading } = useQuery({
     queryKey: ['recommended', preferredGenres.join(',')],
     queryFn: () => getRecommendedShows(preferredGenres, 20),
+  });
+
+  const { data: recommendedMovies, isLoading: moviesLoading } = useQuery({
+    queryKey: ['recommended-movies'],
+    queryFn: () => getRecommendedMovies(10),
+    staleTime: 3600000,
   });
 
   const weekSeed = getWeekSeed();
@@ -285,6 +330,29 @@ const HomePage: React.FC = () => {
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
             {recommended.map((show: TVShow) => (
               <ShowCard key={show.id} show={show} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="section-title mb-4">Filmes recomendados</h2>
+        {moviesLoading ? (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="rounded-xl overflow-hidden animate-pulse">
+                <div className="aspect-[2/3] bg-dark-600" />
+                <div className="p-2 space-y-1">
+                  <div className="h-3 bg-dark-500 rounded w-3/4" />
+                  <div className="h-2 bg-dark-600 rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+            {recommendedMovies?.map((movie: MovieDetails) => (
+              <MovieCard key={movie.imdbID} movie={movie} />
             ))}
           </div>
         )}

@@ -73,3 +73,41 @@ export const getMovieDetails = async (imdbId: string): Promise<MovieDetails> => 
   if ((data as any).Error) throw new Error((data as any).Error);
   return data;
 };
+
+const SEED_QUERIES = ['love', 'star', 'dark', 'night', 'king', 'world', 'time', 'game'];
+
+let recommendedCache: { movies: MovieDetails[]; timestamp: number } | null = null;
+const CACHE_TTL = 3600000;
+
+export const getRecommendedMovies = async (limit = 10): Promise<MovieDetails[]> => {
+  if (recommendedCache && Date.now() - recommendedCache.timestamp < CACHE_TTL) {
+    return recommendedCache.movies.slice(0, limit);
+  }
+  try {
+    const seen = new Set<string>();
+    const results: MovieDetails[] = [];
+    const shuffled = [...SEED_QUERIES].sort(() => Math.random() - 0.5).slice(0, 4);
+    for (const query of shuffled) {
+      if (results.length >= limit * 3) break;
+      try {
+        const data = await fetchJson<SearchResponse>(
+          `${BASE_URL}?s=${encodeURIComponent(query)}&type=movie&apikey=${API_KEY}`
+        );
+        if (data.Response === 'False' || !data.Search) continue;
+        for (const item of data.Search) {
+          if (seen.has(item.imdbID)) continue;
+          seen.add(item.imdbID);
+          try {
+            const details = await getMovieDetails(item.imdbID);
+            results.push(details);
+          } catch {}
+        }
+      } catch {}
+    }
+    const final = results.sort(() => Math.random() - 0.5);
+    recommendedCache = { movies: final, timestamp: Date.now() };
+    return final.slice(0, limit);
+  } catch {
+    return [];
+  }
+};

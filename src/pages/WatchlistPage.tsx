@@ -353,11 +353,20 @@ const WatchlistPage: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {shows.length > 0 ? (
               (() => {
+                const sortPriority = (s: UserShow): number => {
+                  if (s.status === 'completed') return 4;
+                  if (s.status === 'watching' && isUpToDate(s)) return 1;
+                  if (s.status === 'watching') return 0;
+                  if (s.status === 'plan_to_watch') return 2;
+                  if (s.status === 'dropped') return 3;
+                  return 99;
+                };
+                const sorted = statusFilter === 'all' ? [...shows].sort((a, b) => sortPriority(a) - sortPriority(b)) : shows;
                 const filtered = statusFilter === 'all'
-                  ? shows
+                  ? sorted
                   : statusFilter === 'up_to_date'
-                    ? shows.filter(isUpToDate)
-                    : shows.filter((s) => s.status === statusFilter);
+                    ? sorted.filter(isUpToDate)
+                    : sorted.filter((s) => s.status === statusFilter);
                 return filtered.length > 0 ? (
                   filtered.map((show) => (
                     <div key={show.showId} className={removingId === show.showId ? 'opacity-50 pointer-events-none' : ''}>
