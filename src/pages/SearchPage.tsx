@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { searchShows, getShowDetails, getPosterUrl, type TVShow } from '../lib/tvmaze';
-import { addShowToWatchlist, getUserShows } from '../lib/firestore';
+import { searchMovies, type MovieDetails } from '../lib/omdb';
+import { addShowToWatchlist, addMovieToWatchlist, getUserShows } from '../lib/firestore';
 
 const useDebounce = (value: string, delay: number) => {
   const [debounced, setDebounced] = useState(value);
@@ -32,38 +33,51 @@ const CheckIcon = () => (
   </svg>
 );
 
+type SearchMode = 'series' | 'movies';
+
 const SearchPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
-  const [addingId, setAddingId] = useState<number | null>(null);
+  const [mode, setMode] = useState<SearchMode>('series');
+  const [addedIds, setAddedIds] = useState<Set<string | number>>(new Set());
+  const [addingId, setAddingId] = useState<string | number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebounce(query, 350);
 
-  const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['search', debouncedQuery],
+  const seriesQuery = useQuery({
+    queryKey: ['search', 'series', debouncedQuery],
     queryFn: () => searchShows(debouncedQuery),
-    enabled: debouncedQuery.trim().length >= 2,
+    enabled: debouncedQuery.trim().length >= 2 && mode === 'series',
   });
 
-  // Load already-added shows
+  const moviesQuery = useQuery({
+    queryKey: ['search', 'movies', debouncedQuery],
+    queryFn: () => searchMovies(debouncedQuery),
+    enabled: debouncedQuery.trim().length >= 2 && mode === 'movies',
+  });
+
+  const isLoading = mode === 'series' ? seriesQuery.isLoading || seriesQuery.isFetching : moviesQuery.isLoading || moviesQuery.isFetching;
+  const data = mode === 'series' ? seriesQuery.data : moviesQuery.data;
+  const results = mode === 'series'
+    ? (data as TVShow[] | undefined) ?? []
+    : (data as MovieDetails[] | undefined) ?? [];
+
   useEffect(() => {
     if (!user) return;
     getUserShows(user.uid)
       .then((shows) => {
         setAddedIds(new Set(shows.map((s) => s.showId)));
       })
-      .catch((err) => console.error('Erro ao carregar séries adicionadas:', err));
+      .catch((err) => console.error('Erro ao carregar itens adicionados:', err));
   }, [user]);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => { inputRef.current?.focus(); }, [mode]);
 
-  const handleAdd = async (show: TVShow) => {
+  const handleAddShow = async (show: TVShow) => {
     if (!user || addedIds.has(show.id)) return;
     setAddingId(show.id);
     try {
-      // Fetch full details (with seasons) so totalEpisodes/totalSeasons are accurate.
       const details = await getShowDetails(show.id);
       const showToAdd = details.seasons && details.seasons.length > 0 ? details : show;
       await addShowToWatchlist(user.uid, showToAdd, 'watching');
@@ -76,12 +90,49 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  const results = data?.results ?? [];
+  const handleAddMovie = async (movie: MovieDetails) => {
+    if (!user || addedIds.has(movie.imdbID)) return;
+    setAddingId(movie.imdbID);
+    try {
+      await addMovieToWatchlist(user.uid, movie);
+      setAddedIds((prev) => new Set([...prev, movie.imdbID]));
+      navigate(`/movie/${movie.imdbID}`);
+    } catch (err) {
+      console.error('Erro ao adicionar filme:', err);
+    } finally {
+      setAddingId(null);
+    }
+  };
+
   const showResults = debouncedQuery.trim().length >= 2;
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto pb-28 md:pb-0">
-      <h1 className="page-title mb-6">Buscar Séries</h1>
+      <h1 className="page-title mb-6">Buscar</h1>
+
+      {/* Mode toggle */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setMode('series')}
+          className={`text-sm font-medium px-5 py-2 rounded-xl transition-all duration-200 ${
+            mode === 'series'
+              ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/30'
+              : 'bg-dark-700 text-gray-400 hover:text-white hover:bg-dark-600'
+          }`}
+        >
+          Séries
+        </button>
+        <button
+          onClick={() => setMode('movies')}
+          className={`text-sm font-medium px-5 py-2 rounded-xl transition-all duration-200 ${
+            mode === 'movies'
+              ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/30'
+              : 'bg-dark-700 text-gray-400 hover:text-white hover:bg-dark-600'
+          }`}
+        >
+          Filmes
+        </button>
+      </div>
 
       {/* Search input */}
       <div className="relative mb-6">
@@ -95,7 +146,7 @@ const SearchPage: React.FC = () => {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ex: Breaking Bad, Game of Thrones..."
+          placeholder={mode === 'series' ? 'Ex: Breaking Bad, Game of Thrones...' : 'Ex: Inception, Matrix...'}
           className="input-field pl-12 pr-4 text-base"
         />
         {query && (
@@ -109,7 +160,7 @@ const SearchPage: React.FC = () => {
       </div>
 
       {/* Loading */}
-      {(isLoading || isFetching) && showResults && (
+      {isLoading && showResults && (
         <div className="space-y-3">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="card p-4 flex gap-4 animate-pulse">
@@ -124,12 +175,12 @@ const SearchPage: React.FC = () => {
         </div>
       )}
 
-      {/* Results */}
-      {!isLoading && showResults && results.length > 0 && (
+      {/* Results - Series */}
+      {!isLoading && showResults && mode === 'series' && (results as TVShow[]).length > 0 && (
         <div className="animation-fade-in">
-          <p className="text-muted mb-3">{data?.total_results ?? 0} resultados para "{debouncedQuery}"</p>
+          <p className="text-muted mb-3">{results.length} resultados para "{debouncedQuery}"</p>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {results.map((show) => {
+            {(results as TVShow[]).map((show) => {
               const posterUrl = getPosterUrl(show.poster_path, 'w185');
               const isAdded = addedIds.has(show.id);
               const isAdding = addingId === show.id;
@@ -159,7 +210,62 @@ const SearchPage: React.FC = () => {
                     </div>
                   </Link>
                   <button
-                    onClick={() => handleAdd(show)}
+                    onClick={() => handleAddShow(show)}
+                    disabled={isAdded || isAdding}
+                    className={`absolute top-2 right-2 flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 ${
+                      isAdded
+                        ? 'bg-green-500/90 text-white cursor-default'
+                        : 'bg-brand-600/90 hover:bg-brand-500 text-white active:scale-95'
+                    }`}
+                    title={isAdded ? 'Adicionado' : 'Adicionar à lista'}
+                  >
+                    {isAdding ? (
+                      <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ) : isAdded ? (
+                      <CheckIcon />
+                    ) : (
+                      <PlusIcon />
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Results - Movies */}
+      {!isLoading && showResults && mode === 'movies' && (results as MovieDetails[]).length > 0 && (
+        <div className="animation-fade-in">
+          <p className="text-muted mb-3">{results.length} resultados para "{debouncedQuery}"</p>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+            {(results as MovieDetails[]).map((movie) => {
+              const posterUrl = movie.Poster !== 'N/A' ? movie.Poster : null;
+              const isAdded = addedIds.has(movie.imdbID);
+              const isAdding = addingId === movie.imdbID;
+              return (
+                <div key={movie.imdbID} className="card-hover group relative block">
+                  <Link to={`/movie/${movie.imdbID}`} className="block">
+                    <div className="aspect-[2/3] rounded-xl overflow-hidden bg-dark-600 relative">
+                      {posterUrl ? (
+                        <img src={posterUrl} alt={movie.Title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-dark-300">
+                          <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                            <rect x="2" y="3" width="20" height="14" rx="2" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <p className="text-xs font-medium text-white truncate">{movie.Title}</p>
+                      <p className="text-[10px] text-gray-500">
+                        {movie.Year !== 'N/A' ? movie.Year : ''}
+                      </p>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={() => handleAddMovie(movie)}
                     disabled={isAdded || isAdding}
                     className={`absolute top-2 right-2 flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 ${
                       isAdded
@@ -195,8 +301,8 @@ const SearchPage: React.FC = () => {
       {/* Initial state */}
       {!showResults && (
         <div className="text-center py-16">
-          <div className="text-5xl mb-3">🎬</div>
-          <p className="text-white font-semibold">Descubra novas séries</p>
+          <div className="text-5xl mb-3">{mode === 'series' ? '🎬' : '🎥'}</div>
+          <p className="text-white font-semibold">{mode === 'series' ? 'Descubra novas séries' : 'Descubra novos filmes'}</p>
           <p className="text-gray-400 text-sm mt-1">Digite ao menos 2 caracteres para buscar</p>
         </div>
       )}

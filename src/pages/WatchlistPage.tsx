@@ -26,6 +26,20 @@ const STATUS_SOLID: Record<ShowStatus, string> = {
   plan_to_watch: 'bg-yellow-500 text-dark-900',
 };
 
+type StatusFilter = 'all' | ShowStatus | 'up_to_date';
+
+const FILTER_OPTIONS: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'Todas' },
+  { key: 'watching', label: 'Assistindo' },
+  { key: 'up_to_date', label: 'Em dia' },
+  { key: 'completed', label: 'Concluído' },
+  { key: 'dropped', label: 'Abandonado' },
+  { key: 'plan_to_watch', label: 'Quero assistir' },
+];
+
+const isUpToDate = (show: UserShow): boolean =>
+  show.status === 'watching' && show.watchedCount > 0 && show.watchedCount >= show.totalEpisodes;
+
 interface UpNextItem {
   show: UserShow;
   episode: TVEpisode;
@@ -39,6 +53,10 @@ const ShowCard = ({
   onRemove: () => void;
 }) => {
   const posterUrl = getPosterUrl(show.posterPath, 'w342');
+  const displayLabel = isUpToDate(show) ? 'Em dia' : STATUS_LABELS[show.status];
+  const displayStyle = isUpToDate(show)
+    ? 'bg-teal-600 text-white'
+    : STATUS_SOLID[show.status];
 
   return (
     <div className="card overflow-hidden group hover:border-brand-500/40 transition-colors active-show-glow relative">
@@ -52,8 +70,8 @@ const ShowCard = ({
         </div>
 
         {/* Status banner at the bottom of the poster (solid color) */}
-        <div className={`absolute inset-x-0 bottom-0 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide ${STATUS_SOLID[show.status]}`}>
-          {STATUS_LABELS[show.status]}
+        <div className={`absolute inset-x-0 bottom-0 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide ${displayStyle}`}>
+          {displayLabel}
         </div>
       </Link>
 
@@ -130,7 +148,8 @@ const WatchlistPage: React.FC = () => {
   const [showRecent, setShowRecent] = useState(false);
   const [loadingUpNext, setLoadingUpNext] = useState(true);
   const [markingId, setMarkingId] = useState<string | null>(null);
-  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [removingId, setRemovingId] = useState<string | number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   useEffect(() => {
     if (!user) return;
@@ -146,12 +165,12 @@ const WatchlistPage: React.FC = () => {
     for (const show of watching) {
       try {
         const watched = await new Promise<Set<string>>((resolve) => {
-          const unsub = subscribeToWatchedEpisodes(user.uid, show.showId, (ids) => {
+          const unsub = subscribeToWatchedEpisodes(user.uid, Number(show.showId), (ids) => {
             resolve(ids);
             unsub();
           });
         });
-        const all = await getAllEpisodesSorted(show.showId);
+        const all = await getAllEpisodesSorted(Number(show.showId));
         const next = all.find((e) => !watched.has(getEpisodeId(e.season_number, e.episode_number)));
         if (next) items.push({ show, episode: next });
       } catch {
@@ -174,7 +193,7 @@ const WatchlistPage: React.FC = () => {
       const runtime = item.episode.runtime && item.episode.runtime > 0 ? item.episode.runtime : 30;
       await markEpisodeWatched(
         user.uid,
-        item.show.showId,
+        Number(item.show.showId),
         item.episode.season_number,
         item.episode.episode_number,
         runtime
@@ -187,7 +206,7 @@ const WatchlistPage: React.FC = () => {
     }
   };
 
-  const handleRemove = async (showId: number) => {
+  const handleRemove = async (showId: string | number) => {
     if (!user) return;
     setRemovingId(showId);
     try {
@@ -311,30 +330,64 @@ const WatchlistPage: React.FC = () => {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 animation-fade-in">
-          {shows.length > 0 ? (
-            shows.map((show) => (
-              <div key={show.showId} className={removingId === show.showId ? 'opacity-50 pointer-events-none' : ''}>
-                <ShowCard
-                  show={show}
-                  onRemove={() => handleRemove(show.showId)}
-                />
+        <div className="animation-fade-in">
+          {/* Status filter */}
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {FILTER_OPTIONS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setStatusFilter(key)}
+                className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 ${
+                  statusFilter === key
+                    ? key === 'up_to_date'
+                      ? 'bg-teal-600 text-white shadow-sm'
+                      : 'bg-brand-600 text-white shadow-sm'
+                    : 'bg-dark-700 text-gray-400 hover:text-white hover:bg-dark-600'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {shows.length > 0 ? (
+              (() => {
+                const filtered = statusFilter === 'all'
+                  ? shows
+                  : statusFilter === 'up_to_date'
+                    ? shows.filter(isUpToDate)
+                    : shows.filter((s) => s.status === statusFilter);
+                return filtered.length > 0 ? (
+                  filtered.map((show) => (
+                    <div key={show.showId} className={removingId === show.showId ? 'opacity-50 pointer-events-none' : ''}>
+                      <ShowCard
+                        show={show}
+                        onRemove={() => handleRemove(show.showId)}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-16">
+                    <p className="text-gray-400 text-sm">Nenhuma série encontrada com este filtro.</p>
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="col-span-full text-center py-16">
+                <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-500/20 flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                    <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+                  </svg>
+                </div>
+                <p className="text-white font-semibold">Sua lista está vazia</p>
+                <p className="text-gray-400 text-sm mt-1">Busque séries para começar a adicionar!</p>
+                <Link to="/search" className="btn-primary inline-flex mt-4">
+                  Buscar séries
+                </Link>
               </div>
-            ))
-          ) : (
-            <div className="text-center py-16">
-              <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-500/20 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                  <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
-                </svg>
-              </div>
-              <p className="text-white font-semibold">Sua lista está vazia</p>
-              <p className="text-gray-400 text-sm mt-1">Busque séries para começar a adicionar!</p>
-              <Link to="/search" className="btn-primary inline-flex mt-4">
-                Buscar séries
-              </Link>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>

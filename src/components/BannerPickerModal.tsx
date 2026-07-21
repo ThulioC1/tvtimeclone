@@ -5,10 +5,10 @@ import { getBannerUrl, type UserShow } from '../lib/firestore';
 interface Props {
   open: boolean;
   shows: UserShow[];
-  currentBannerShowId: number | null;
+  currentBannerShowId: number | string | null;
   saving: boolean;
   onClose: () => void;
-  onPick: (showId: number | null) => void;
+  onPick: (showId: number | string | null) => void;
 }
 
 const BannerPickerModal: React.FC<Props> = ({
@@ -41,11 +41,11 @@ const BannerPickerModal: React.FC<Props> = ({
           <>
             <div className="grid grid-cols-3 gap-3 mb-4">
               {shows.map((s) => {
-                const selected = s.showId === currentBannerShowId;
+                const selected = String(s.showId) === String(currentBannerShowId);
                 const img = getBannerUrl([s], s.showId) || getPosterUrl(s.posterPath);
                 return (
                   <button
-                    key={s.showId}
+                    key={String(s.showId)}
                     onClick={() => onPick(s.showId)}
                     disabled={saving}
                     className={`relative aspect-video rounded-xl overflow-hidden ring-2 transition ${

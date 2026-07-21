@@ -63,7 +63,7 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const handlePickBanner = async (showId: number | null) => {
+  const handlePickBanner = async (showId: number | string | null) => {
     if (!user) return;
     setSavingBanner(true);
     try {

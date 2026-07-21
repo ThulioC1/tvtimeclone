@@ -15,10 +15,12 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { TVShow } from './tvmaze';
+import type { MovieDetails } from './omdb';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ShowStatus = 'watching' | 'completed' | 'dropped' | 'plan_to_watch';
+export type MediaType = 'tv' | 'movie';
 
 export interface UserProfile {
   uid: string;
@@ -32,11 +34,12 @@ export interface UserProfile {
 }
 
 export interface UserShow {
-  showId: number;
+  showId: string | number;
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
   status: ShowStatus;
+  mediaType?: MediaType;
   totalEpisodes: number;
   watchedCount: number;
   addedAt: Date;
@@ -85,16 +88,16 @@ export const updateUserProfile = async (
   await updateDoc(ref, data as any);
 };
 
-export const setBannerShow = async (uid: string, showId: number | null): Promise<void> => {
+export const setBannerShow = async (uid: string, showId: number | string | null): Promise<void> => {
   await updateDoc(doc(db, 'users', uid), { bannerShowId: showId });
 };
 
 export const getBannerUrl = (
   shows: UserShow[],
-  bannerShowId: number | null
+  bannerShowId: number | string | null
 ): string | null => {
   if (bannerShowId == null) return null;
-  const show = shows.find((s) => s.showId === bannerShowId);
+  const show = shows.find((s) => String(s.showId) === String(bannerShowId));
   if (!show) return null;
   return show.backdropPath || show.posterPath || null;
 };
@@ -113,11 +116,12 @@ export const addShowToWatchlist = async (
       .reduce((sum, s) => sum + s.episode_count, 0) ?? show.number_of_episodes ?? 0;
 
   await setDoc(ref, {
-    showId: show.id,
+    showId: String(show.id),
     title: show.name,
     posterPath: show.poster_path,
     backdropPath: show.backdrop_path,
     status,
+    mediaType: 'tv',
     totalEpisodes,
     totalSeasons: show.number_of_seasons ?? show.seasons?.filter((s) => s.season_number > 0).length ?? 1,
     watchedCount: 0,
@@ -128,10 +132,33 @@ export const addShowToWatchlist = async (
   } satisfies Omit<UserShow, 'addedAt' | 'lastWatchedAt'> & { addedAt: any; lastWatchedAt: any });
 };
 
-export const removeShowFromWatchlist = async (uid: string, showId: number): Promise<void> => {
+export const addMovieToWatchlist = async (
+  uid: string,
+  movie: MovieDetails,
+  status: ShowStatus = 'plan_to_watch'
+): Promise<void> => {
+  const ref = doc(db, 'users', uid, 'userShows', movie.imdbID);
+  await setDoc(ref, {
+    showId: movie.imdbID,
+    title: movie.Title,
+    posterPath: movie.Poster !== 'N/A' ? movie.Poster : null,
+    backdropPath: movie.Poster !== 'N/A' ? movie.Poster : null,
+    status,
+    mediaType: 'movie',
+    totalEpisodes: 1,
+    totalSeasons: 0,
+    watchedCount: 0,
+    addedAt: serverTimestamp(),
+    lastWatchedAt: null,
+    isFavorite: false,
+    genres: movie.Genre !== 'N/A' ? movie.Genre.split(', ').map((g) => g.trim()) : [],
+  } satisfies Omit<UserShow, 'addedAt' | 'lastWatchedAt'> & { addedAt: any; lastWatchedAt: any });
+};
+
+export const removeShowFromWatchlist = async (uid: string, showId: string | number): Promise<void> => {
   const ref = doc(db, 'users', uid, 'userShows', String(showId));
   await deleteDoc(ref);
-  // Also remove all episodes
+  // Also remove all episodes (harmless for movies, no episodes subcollection)
   const episodesRef = collection(db, 'users', uid, 'userShows', String(showId), 'episodes');
   const episodesSnap = await getDocs(episodesRef);
   const deletePromises = episodesSnap.docs.map((d) => deleteDoc(d.ref));
@@ -140,7 +167,7 @@ export const removeShowFromWatchlist = async (uid: string, showId: number): Prom
 
 export const updateShowStatus = async (
   uid: string,
-  showId: number,
+  showId: string | number,
   status: ShowStatus
 ): Promise<void> => {
   const ref = doc(db, 'users', uid, 'userShows', String(showId));
@@ -149,7 +176,7 @@ export const updateShowStatus = async (
 
 export const toggleFavorite = async (
   uid: string,
-  showId: number,
+  showId: string | number,
   isFavorite: boolean
 ): Promise<void> => {
   const ref = doc(db, 'users', uid, 'userShows', String(showId));

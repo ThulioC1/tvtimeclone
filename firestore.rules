@@ -21,7 +21,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'showId', 'title', 'posterPath', 'backdropPath', 'status',
           'totalEpisodes', 'totalSeasons', 'watchedCount', 'addedAt',
-          'lastWatchedAt', 'isFavorite', 'genres'
+          'lastWatchedAt', 'isFavorite', 'genres', 'mediaType'
         ])
         && request.resource.data.showId is int
         && request.resource.data.title is string

@@ -159,7 +159,7 @@ const HomePage: React.FC = () => {
   const bannerUrl = getBannerUrl(userShows, userProfile?.bannerShowId ?? null);
   const avatarUrl = userProfile?.photoURL || user?.photoURL || null;
 
-  const handlePickBanner = async (showId: number | null) => {
+  const handlePickBanner = async (showId: number | string | null) => {
     if (!user) return;
     setSavingBanner(true);
     try {
