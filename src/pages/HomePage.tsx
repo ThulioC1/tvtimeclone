@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToUserShows, setBannerShow, getBannerUrl, type UserShow } from '../lib/firestore';
+import { getBackdropUrl } from '../lib/tmdb';
 import { formatWatchTimeShort } from '../lib/format';
 import BannerPickerModal from '../components/BannerPickerModal';
 import { getTrendingTVShows, getTrendingMovies, getPosterUrl, type TVShow, type TMDBMovieSimple } from '../lib/tmdb';
@@ -187,7 +188,8 @@ const HomePage: React.FC = () => {
   const [savingBanner, setSavingBanner] = useState(false);
 
   const avatarLetter = (userProfile?.displayName || user?.displayName || user?.email || 'U')[0].toUpperCase();
-  const bannerUrl = getBannerUrl(userShows, userProfile?.bannerShowId ?? null);
+  const bannerRaw = getBannerUrl(userShows, userProfile?.bannerShowId ?? null);
+  const bannerUrl = bannerRaw ? getBackdropUrl(bannerRaw) : null;
   const avatarUrl = userProfile?.photoURL || user?.photoURL || null;
 
   const handlePickBanner = async (showId: number | string | null) => {

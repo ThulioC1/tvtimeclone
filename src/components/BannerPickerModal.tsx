@@ -1,5 +1,5 @@
 import React from 'react';
-import { getPosterUrl } from '../lib/tmdb';
+import { getPosterUrl, getBackdropUrl } from '../lib/tmdb';
 import { getBannerUrl, type UserShow } from '../lib/firestore';
 
 interface Props {
@@ -42,7 +42,8 @@ const BannerPickerModal: React.FC<Props> = ({
             <div className="grid grid-cols-3 gap-3 mb-4">
               {shows.map((s) => {
                 const selected = String(s.showId) === String(currentBannerShowId);
-                const img = getBannerUrl([s], s.showId) || getPosterUrl(s.posterPath);
+                const bannerRaw = getBannerUrl([s], s.showId);
+                const img = bannerRaw ? getBackdropUrl(bannerRaw) : getPosterUrl(s.posterPath);
                 return (
                   <button
                     key={String(s.showId)}

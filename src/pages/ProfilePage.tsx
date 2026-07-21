@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToUserShows, setBannerShow, getBannerUrl, recalculateUserStats, type UserShow } from '../lib/firestore';
+import { getBackdropUrl } from '../lib/tmdb';
 import { formatWatchTime } from '../lib/format';
 import BannerPickerModal from '../components/BannerPickerModal';
 
@@ -76,7 +77,8 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const bannerUrl = getBannerUrl(shows, userProfile?.bannerShowId ?? null);
+  const bannerRaw = getBannerUrl(shows, userProfile?.bannerShowId ?? null);
+  const bannerUrl = bannerRaw ? getBackdropUrl(bannerRaw) : null;
 
   return (
     <div className="max-w-2xl mx-auto pb-28 md:pb-0">
