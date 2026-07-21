@@ -11,13 +11,12 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'coverURL', 'bannerShowId', 'createdAt', 'totalWatchMinutes'])
         && request.resource.data.displayName is string
         && request.resource.data.email is string;
-      allow update: if request.auth != null && request.auth.uid == userId
-        && (request.resource.data.uid == userId || !request.resource.data.keys().has('uid'));
+      allow update: if request.auth != null && request.auth.uid == userId;
 
       // ── UserShows (subcollection) ────────────────────────────────────────
       match /userShows/{showId} {
         allow read: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null && request.auth.uid == userId
+      allow create: if request.auth != null && request.auth.uid == userId
         && request.resource.data.keys().hasOnly([
           'showId', 'title', 'posterPath', 'backdropPath', 'status',
           'totalEpisodes', 'totalSeasons', 'watchedCount', 'addedAt',
@@ -28,6 +27,7 @@ service cloud.firestore {
         && request.resource.data.status in ['watching', 'completed', 'dropped', 'plan_to_watch']
           && request.resource.data.watchedCount is int
           && request.resource.data.watchedCount >= 0;
+      allow update: if request.auth != null && request.auth.uid == userId;
         allow delete: if request.auth != null && request.auth.uid == userId;
 
         // ── Episodes (sub-subcollection) ─────────────────────────────────

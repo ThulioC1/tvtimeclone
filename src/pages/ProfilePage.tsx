@@ -150,7 +150,7 @@ const ProfilePage: React.FC = () => {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
         <div className="card p-4 sm:p-5 rounded-2xl">
-          <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{shows.length}</div>
+          <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{shows.filter((s) => s.mediaType !== 'movie').length}</div>
           <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Séries na lista</div>
         </div>
         <div className="card p-4 sm:p-5 rounded-2xl">
@@ -163,7 +163,7 @@ const ProfilePage: React.FC = () => {
         </div>
         <div className="card p-4 sm:p-5 rounded-2xl">
           <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">
-            {shows.filter((s) => s.status === 'completed').length}
+            {shows.filter((s) => s.mediaType !== 'movie' && s.status === 'completed').length}
           </div>
           <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Séries concluídas</div>
         </div>
