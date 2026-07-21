@@ -42,6 +42,18 @@ const ChevronDownIcon = () => (
   </svg>
 );
 
+const ChevronIcon = ({ open }: { open: boolean }) => (
+  <svg
+    viewBox="0 0 24 24"
+    className={`w-5 h-5 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+  </svg>
+);
+
 const StarIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-yellow-400">
     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -362,6 +374,113 @@ const SeasonEpisodes = ({
   );
 };
 
+const SeasonAccordion = ({
+  season,
+  showId,
+  watchedEpisodes,
+  watchedDocs,
+  onToggleEpisode,
+  onOpenEpisode,
+  togglingId,
+  open,
+  onToggle,
+  onMarkSeason,
+  onUnmarkSeason,
+}: {
+  season: TVSeason;
+  showId: number;
+  watchedEpisodes: Set<string>;
+  watchedDocs: Map<string, { watchedAt: Date | null; runtime?: number }>;
+  onToggleEpisode: (episode: TVEpisode) => void;
+  onOpenEpisode: (episode: TVEpisode) => void;
+  togglingId: string | null;
+  open: boolean;
+  onToggle: () => void;
+  onMarkSeason: (seasonNumber: number) => void;
+  onUnmarkSeason: (seasonNumber: number) => void;
+}) => {
+  const { data: seasonData, isLoading } = useQuery({
+    queryKey: ['season', showId, season.season_number],
+    queryFn: () => getSeasonDetails(showId, season.season_number),
+    enabled: open,
+  });
+
+  const episodes = seasonData?.episodes ?? [];
+  const watchedInSeason = episodes.filter((ep) =>
+    watchedEpisodes.has(getEpisodeId(ep.season_number, ep.episode_number))
+  ).length;
+  const seasonComplete = episodes.length > 0 && watchedInSeason === episodes.length;
+  const progress = episodes.length > 0 ? (watchedInSeason / episodes.length) * 100 : 0;
+
+  return (
+    <div className="card overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-4 hover:bg-dark-600/30 transition-colors"
+      >
+        <div className="flex-1 text-left">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-medium text-white">Temporada {season.season_number}</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {season.episode_count} episódios
+                {episodes.length > 0 && ` · ${watchedInSeason} assistidos`}
+              </p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                seasonComplete
+                  ? onUnmarkSeason(season.season_number)
+                  : onMarkSeason(season.season_number);
+              }}
+              disabled={episodes.length === 0}
+              className={`shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 disabled:opacity-40 ${
+                seasonComplete
+                  ? 'bg-dark-600 text-gray-300 hover:bg-dark-500'
+                  : 'bg-brand-500/15 text-brand-400 hover:bg-brand-500/25'
+              }`}
+            >
+              {seasonComplete ? 'Desmarcar temp.' : '✓ Marcar temp.'}
+            </button>
+          </div>
+          {episodes.length > 0 && (
+            <div className="progress-bar mt-2">
+              <div className="progress-fill" style={{ width: `${progress}%` }} />
+            </div>
+          )}
+        </div>
+        <ChevronIcon open={open} />
+      </button>
+
+      {open && (
+        <div className="border-t border-dark-500 px-3 py-2 space-y-1 animation-fade-in">
+          {isLoading ? (
+            <div className="py-4 flex justify-center">
+              <span className="w-5 h-5 border-2 border-dark-400 border-t-brand-500 rounded-full animate-spin" />
+            </div>
+          ) : (
+            episodes.map((ep) => {
+              const id = getEpisodeId(ep.season_number, ep.episode_number);
+              return (
+                <EpisodeRow
+                  key={ep.id}
+                  episode={ep}
+                  watched={watchedEpisodes.has(id)}
+                  watchedAt={watchedDocs.get(id)?.watchedAt ?? null}
+                  onToggle={() => onToggleEpisode(ep)}
+                  onOpen={() => onOpenEpisode(ep)}
+                  toggling={togglingId === id}
+                />
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ShowDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -376,6 +495,10 @@ const ShowDetailPage: React.FC = () => {
   const [trailerId, setTrailerId] = useState<string | null>(null);
   const [isFav, setIsFav] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
+  const [openSeason, setOpenSeason] = useState<number | null>(null);
+  const [seasonLayout, setSeasonLayout] = useState<'dropdown' | 'accordion'>(() => {
+    return (localStorage.getItem('seasonLayout') as 'dropdown' | 'accordion') || 'dropdown';
+  });
   const [markingAll, setMarkingAll] = useState(false);
   const [openEpisode, setOpenEpisode] = useState<TVEpisode | null>(null);
 
@@ -713,38 +836,103 @@ const ShowDetailPage: React.FC = () => {
         {/* Seasons */}
         {seasons.length > 0 && (
           <div className="mt-6">
-            <h2 className="section-title mb-3">Temporadas</h2>
-
-            <div className="relative">
-              <select
-                value={activeSeasonNumber ?? ''}
-                onChange={(e) => setSelectedSeason(Number(e.target.value))}
-                className="input-field w-full text-sm py-2.5 pr-10 appearance-none cursor-pointer"
-              >
-                {seasons.map((season) => (
-                  <option key={season.id} value={season.season_number}>
-                    Temporada {season.season_number}
-                    {season.episode_count ? ` · ${season.episode_count} eps` : ''}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                <ChevronDownIcon />
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="section-title mb-0">Temporadas</h2>
+              <div className="flex bg-dark-700 rounded-xl p-0.5 border border-white/5">
+                <button
+                  onClick={() => {
+                    setSeasonLayout('dropdown');
+                    localStorage.setItem('seasonLayout', 'dropdown');
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                    seasonLayout === 'dropdown'
+                      ? 'bg-dark-500 text-white shadow-sm'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  title="Visualização por dropdown"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 inline-block mr-1">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  Dropdown
+                </button>
+                <button
+                  onClick={() => {
+                    setSeasonLayout('accordion');
+                    localStorage.setItem('seasonLayout', 'accordion');
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                    seasonLayout === 'accordion'
+                      ? 'bg-dark-500 text-white shadow-sm'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  title="Visualização por accordion"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 inline-block mr-1">
+                    <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Accordion
+                </button>
               </div>
             </div>
 
-            {activeSeason && (
-              <SeasonEpisodes
-                showId={showId}
-                season={activeSeason}
-                watchedEpisodes={watchedEpisodes}
-                watchedDocs={watchedDocs}
-                onToggleEpisode={handleToggleEpisode}
-                onOpenEpisode={setOpenEpisode}
-                onMarkSeason={handleMarkSeason}
-                onUnmarkSeason={handleUnmarkSeason}
-                togglingId={togglingId}
-              />
+            {seasonLayout === 'dropdown' ? (
+              <>
+                <div className="relative">
+                  <select
+                    value={activeSeasonNumber ?? ''}
+                    onChange={(e) => setSelectedSeason(Number(e.target.value))}
+                    className="input-field w-full text-sm py-2.5 pr-10 appearance-none cursor-pointer"
+                  >
+                    {seasons.map((season) => (
+                      <option key={season.id} value={season.season_number}>
+                        Temporada {season.season_number}
+                        {season.episode_count ? ` · ${season.episode_count} eps` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                    <ChevronDownIcon />
+                  </div>
+                </div>
+
+                {activeSeason && (
+                  <SeasonEpisodes
+                    showId={showId}
+                    season={activeSeason}
+                    watchedEpisodes={watchedEpisodes}
+                    watchedDocs={watchedDocs}
+                    onToggleEpisode={handleToggleEpisode}
+                    onOpenEpisode={setOpenEpisode}
+                    onMarkSeason={handleMarkSeason}
+                    onUnmarkSeason={handleUnmarkSeason}
+                    togglingId={togglingId}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="space-y-3">
+                {seasons.map((season) => (
+                  <SeasonAccordion
+                    key={season.id}
+                    season={season}
+                    showId={showId}
+                    watchedEpisodes={watchedEpisodes}
+                    watchedDocs={watchedDocs}
+                    onToggleEpisode={handleToggleEpisode}
+                    onOpenEpisode={setOpenEpisode}
+                    togglingId={togglingId}
+                    open={openSeason === season.season_number}
+                    onToggle={() =>
+                      setOpenSeason((cur) =>
+                        cur === season.season_number ? null : season.season_number
+                      )
+                    }
+                    onMarkSeason={handleMarkSeason}
+                    onUnmarkSeason={handleUnmarkSeason}
+                  />
+                ))}
+              </div>
             )}
           </div>
         )}
