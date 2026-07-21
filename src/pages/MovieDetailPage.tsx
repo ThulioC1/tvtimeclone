@@ -156,10 +156,10 @@ const MovieDetailPage: React.FC = () => {
             alt={movie.Title}
             loading="lazy"
             className="w-full h-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.querySelector('.hero-fallback')?.classList.remove('hidden'); }}
           />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-dark-600 to-dark-800" />
-        )}
+        ) : null}
+        <div className={`hero-fallback ${posterUrl ? 'hidden' : ''} absolute inset-0 bg-gradient-to-br from-dark-600 to-dark-800`} />
         <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/50 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-dark-900/70 to-transparent" />
         <button
@@ -174,7 +174,13 @@ const MovieDetailPage: React.FC = () => {
         <div className="flex gap-4 md:gap-5">
           <div className="w-28 h-40 md:w-32 md:h-48 rounded-2xl overflow-hidden bg-dark-600 shrink-0 border border-white/10 shadow-2xl shadow-black/60 ring-1 ring-white/5">
             {posterUrl ? (
-              <img src={posterUrl} alt={movie.Title} loading="lazy" className="w-full h-full object-cover" />
+              <img
+                src={posterUrl}
+                alt={movie.Title}
+                loading="lazy"
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.classList.add('bg-dark-500'); }}
+              />
             ) : (
               <div className="w-full h-full bg-dark-500" />
             )}

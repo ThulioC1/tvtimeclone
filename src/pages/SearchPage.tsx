@@ -248,14 +248,19 @@ const SearchPage: React.FC = () => {
                   <Link to={`/movie/${movie.imdbID}`} className="block">
                     <div className="aspect-[2/3] rounded-xl overflow-hidden bg-dark-600 relative">
                       {posterUrl ? (
-                        <img src={posterUrl} alt={movie.Title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-dark-300">
-                          <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                            <rect x="2" y="3" width="20" height="14" rx="2" />
-                          </svg>
-                        </div>
-                      )}
+                        <img
+                          src={posterUrl}
+                          alt={movie.Title}
+                          loading="lazy"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.querySelector('.fallback')?.classList.remove('hidden'); }}
+                        />
+                      ) : null}
+                      <div className={`fallback ${posterUrl ? 'hidden' : ''} absolute inset-0 flex items-center justify-center text-dark-300 bg-dark-600`}>
+                        <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                          <rect x="2" y="3" width="20" height="14" rx="2" />
+                        </svg>
+                      </div>
                     </div>
                     <div className="p-2">
                       <p className="text-xs font-medium text-white truncate">{movie.Title}</p>
