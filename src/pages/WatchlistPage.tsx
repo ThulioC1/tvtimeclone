@@ -10,9 +10,17 @@ import {
   type UserShow,
   type ShowStatus,
 } from '../lib/firestore';
-import { getPosterUrl, getAllEpisodesSorted, type TVEpisode } from '../lib/tvmaze';
+import { getPosterUrl, getAllEpisodes as tmdbGetAllEpisodes, type TVEpisode } from '../lib/tmdb';
+import { getAllEpisodesSorted as tvmazeGetAllEpisodes } from '../lib/tvmaze';
 
 const STATUS_LABELS: Record<ShowStatus, string> = {
+  watching: 'Assistindo',
+  completed: 'Concluído',
+  dropped: 'Abandonado',
+  plan_to_watch: 'Quero assistir',
+};
+
+const MOVIE_STATUS_LABELS: Record<ShowStatus, string> = {
   watching: 'Assistindo',
   completed: 'Concluído',
   dropped: 'Abandonado',
@@ -28,10 +36,19 @@ const STATUS_SOLID: Record<ShowStatus, string> = {
 
 type StatusFilter = 'all' | ShowStatus | 'up_to_date';
 
-const FILTER_OPTIONS: { key: StatusFilter; label: string }[] = [
+const SERIES_FILTER_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'Todas' },
   { key: 'watching', label: 'Assistindo' },
   { key: 'up_to_date', label: 'Em dia' },
+  { key: 'completed', label: 'Concluído' },
+  { key: 'dropped', label: 'Abandonado' },
+  { key: 'plan_to_watch', label: 'Quero assistir' },
+];
+
+const MOVIE_FILTER_OPTIONS: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'Todos' },
+  { key: 'up_to_date', label: 'Assistido' },
+  { key: 'watching', label: 'Assistindo' },
   { key: 'completed', label: 'Concluído' },
   { key: 'dropped', label: 'Abandonado' },
   { key: 'plan_to_watch', label: 'Quero assistir' },
@@ -98,6 +115,61 @@ const ShowCard = ({
   );
 };
 
+const MovieCard = ({
+  show,
+  onRemove,
+}: {
+  show: UserShow;
+  onRemove: () => void;
+}) => {
+  const posterUrl = getPosterUrl(show.posterPath, 'w342');
+  const isWatched = show.watchedCount > 0 && show.watchedCount >= show.totalEpisodes;
+  const displayLabel = isWatched && show.status === 'watching' ? 'Assistido' : MOVIE_STATUS_LABELS[show.status];
+  const displayStyle = isWatched && show.status === 'watching'
+    ? 'bg-teal-600 text-white'
+    : STATUS_SOLID[show.status];
+
+  return (
+    <div className="card overflow-hidden group hover:border-brand-500/40 transition-colors active-show-glow relative">
+      <Link to={`/movie/${show.showId}`} className="block relative">
+        <div className="aspect-[2/3] w-full bg-dark-500 overflow-hidden">
+          {posterUrl ? (
+            <img src={posterUrl} alt={show.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div className="w-full h-full bg-dark-500" />
+          )}
+        </div>
+
+        <div className={`absolute inset-x-0 bottom-0 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide ${displayStyle}`}>
+          {displayLabel}
+        </div>
+      </Link>
+
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-2">
+          <Link to={`/movie/${show.showId}`}>
+            <h3 className="font-semibold text-white hover:text-brand-400 transition-colors truncate text-sm">
+              {show.title}
+            </h3>
+          </Link>
+          <button
+            onClick={onRemove}
+            className="text-gray-600 hover:text-red-400 transition-colors shrink-0 text-lg leading-none"
+            title="Remover da lista"
+          >
+            ×
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {isWatched ? 'Assistido' : 'Não assistido'}
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const UpNextCard = ({
   item,
   onMarkWatched,
@@ -142,7 +214,7 @@ const UpNextCard = ({
 const WatchlistPage: React.FC = () => {
   const { user } = useAuth();
   const [shows, setShows] = useState<UserShow[]>([]);
-  const [mainTab, setMainTab] = useState<'upnext' | 'list'>('upnext');
+  const [mainTab, setMainTab] = useState<'upnext' | 'series' | 'movies'>('upnext');
   const [upNext, setUpNext] = useState<UpNextItem[]>([]);
   const [recentlyWatched, setRecentlyWatched] = useState<UpNextItem[]>([]);
   const [showRecent, setShowRecent] = useState(false);
@@ -160,7 +232,7 @@ const WatchlistPage: React.FC = () => {
   const loadUpNext = useCallback(async () => {
     if (!user) return;
     setLoadingUpNext(true);
-    const watching = shows.filter((s) => s.status === 'watching');
+    const watching = shows.filter((s) => s.status === 'watching' && s.mediaType !== 'movie');
     const items: UpNextItem[] = [];
     for (const show of watching) {
       try {
@@ -170,7 +242,9 @@ const WatchlistPage: React.FC = () => {
             unsub();
           });
         });
-        const all = await getAllEpisodesSorted(Number(show.showId));
+        const all = show.source === 'tmdb'
+          ? await tmdbGetAllEpisodes(Number(show.showId)).catch(() => tvmazeGetAllEpisodes(Number(show.showId)))
+          : await tvmazeGetAllEpisodes(Number(show.showId));
         const next = all.find((e) => !watched.has(getEpisodeId(e.season_number, e.episode_number)));
         if (next) items.push({ show, episode: next });
       } catch {
@@ -182,6 +256,7 @@ const WatchlistPage: React.FC = () => {
   }, [user, shows]);
 
   useEffect(() => {
+    setStatusFilter('all');
     if (mainTab === 'upnext') loadUpNext();
   }, [mainTab, loadUpNext]);
 
@@ -218,12 +293,13 @@ const WatchlistPage: React.FC = () => {
 
   const tabs = [
     { key: 'upnext' as const, label: 'Up Next' },
-    { key: 'list' as const, label: 'Minhas Séries' },
+    { key: 'series' as const, label: 'Minhas Séries' },
+    { key: 'movies' as const, label: 'Filmes' },
   ];
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto pb-28 md:pb-0">
-      <h1 className="page-title mb-6">Minhas Séries</h1>
+      <h1 className="page-title mb-6">Minha Lista</h1>
 
       {/* Main tabs */}
       <div className="flex gap-2 mb-6">
@@ -329,11 +405,11 @@ const WatchlistPage: React.FC = () => {
             </div>
           )}
         </div>
-      ) : (
+      ) : mainTab === 'series' ? (
         <div className="animation-fade-in">
           {/* Status filter */}
           <div className="flex flex-wrap gap-1.5 mb-4">
-            {FILTER_OPTIONS.map(({ key, label }) => (
+            {SERIES_FILTER_OPTIONS.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setStatusFilter(key)}
@@ -351,51 +427,126 @@ const WatchlistPage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {shows.length > 0 ? (
-              (() => {
-                const sortPriority = (s: UserShow): number => {
-                  if (s.status === 'completed') return 4;
-                  if (s.status === 'watching' && isUpToDate(s)) return 1;
-                  if (s.status === 'watching') return 0;
-                  if (s.status === 'plan_to_watch') return 2;
-                  if (s.status === 'dropped') return 3;
-                  return 99;
-                };
-                const sorted = statusFilter === 'all' ? [...shows].sort((a, b) => sortPriority(a) - sortPriority(b)) : shows;
-                const filtered = statusFilter === 'all'
-                  ? sorted
-                  : statusFilter === 'up_to_date'
-                    ? sorted.filter(isUpToDate)
-                    : sorted.filter((s) => s.status === statusFilter);
-                return filtered.length > 0 ? (
-                  filtered.map((show) => (
-                    <div key={show.showId} className={removingId === show.showId ? 'opacity-50 pointer-events-none' : ''}>
-                      <ShowCard
-                        show={show}
-                        onRemove={() => handleRemove(show.showId)}
-                      />
-                    </div>
-                  ))
-                ) : (
+            {(() => {
+              const series = shows.filter((s) => s.mediaType !== 'movie');
+              if (series.length === 0) {
+                return (
                   <div className="col-span-full text-center py-16">
-                    <p className="text-gray-400 text-sm">Nenhuma série encontrada com este filtro.</p>
+                    <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-500/20 flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                        <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+                      </svg>
+                    </div>
+                    <p className="text-white font-semibold">Sua lista está vazia</p>
+                    <p className="text-gray-400 text-sm mt-1">Busque séries para começar a adicionar!</p>
+                    <Link to="/search" className="btn-primary inline-flex mt-4">
+                      Buscar séries
+                    </Link>
                   </div>
                 );
-              })()
-            ) : (
-              <div className="col-span-full text-center py-16">
-                <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-500/20 flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                    <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
-                  </svg>
+              }
+              const sortPriority = (s: UserShow): number => {
+                if (s.status === 'completed') return 4;
+                if (s.status === 'watching' && isUpToDate(s)) return 1;
+                if (s.status === 'watching') return 0;
+                if (s.status === 'plan_to_watch') return 2;
+                if (s.status === 'dropped') return 3;
+                return 99;
+              };
+              const sorted = statusFilter === 'all' ? [...series].sort((a, b) => sortPriority(a) - sortPriority(b)) : series;
+              const filtered = statusFilter === 'all'
+                ? sorted
+                : statusFilter === 'up_to_date'
+                  ? sorted.filter(isUpToDate)
+                  : sorted.filter((s) => s.status === statusFilter);
+              return filtered.length > 0 ? (
+                filtered.map((show) => (
+                  <div key={show.showId} className={removingId === show.showId ? 'opacity-50 pointer-events-none' : ''}>
+                    <ShowCard
+                      show={show}
+                      onRemove={() => handleRemove(show.showId)}
+                    />
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-16">
+                  <p className="text-gray-400 text-sm">Nenhuma série encontrada com este filtro.</p>
                 </div>
-                <p className="text-white font-semibold">Sua lista está vazia</p>
-                <p className="text-gray-400 text-sm mt-1">Busque séries para começar a adicionar!</p>
-                <Link to="/search" className="btn-primary inline-flex mt-4">
-                  Buscar séries
-                </Link>
-              </div>
-            )}
+              );
+            })()}
+          </div>
+        </div>
+      ) : (
+        <div className="animation-fade-in">
+          {/* Status filter */}
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {MOVIE_FILTER_OPTIONS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setStatusFilter(key)}
+                className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 ${
+                  statusFilter === key
+                    ? key === 'up_to_date'
+                      ? 'bg-teal-600 text-white shadow-sm'
+                      : 'bg-brand-600 text-white shadow-sm'
+                    : 'bg-dark-700 text-gray-400 hover:text-white hover:bg-dark-600'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {(() => {
+              const movies = shows.filter((s) => s.mediaType === 'movie');
+              if (movies.length === 0) {
+                return (
+                  <div className="col-span-full text-center py-16">
+                    <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-500/20 flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                      </svg>
+                    </div>
+                    <p className="text-white font-semibold">Nenhum filme na lista</p>
+                    <p className="text-gray-400 text-sm mt-1">Busque filmes para começar a adicionar!</p>
+                    <Link to="/search" className="btn-primary inline-flex mt-4">
+                      Buscar filmes
+                    </Link>
+                  </div>
+                );
+              }
+              const isMovieWatched = (s: UserShow): boolean =>
+                s.watchedCount > 0 && s.watchedCount >= s.totalEpisodes;
+              const sortPriority = (s: UserShow): number => {
+                if (s.status === 'completed') return 5;
+                if (isMovieWatched(s)) return 0;
+                if (s.status === 'watching') return 1;
+                if (s.status === 'plan_to_watch') return 2;
+                if (s.status === 'dropped') return 3;
+                return 99;
+              };
+              const sorted = statusFilter === 'all' ? [...movies].sort((a, b) => sortPriority(a) - sortPriority(b)) : movies;
+              const filtered = statusFilter === 'all'
+                ? sorted
+                : statusFilter === 'up_to_date'
+                  ? sorted.filter(isMovieWatched)
+                  : sorted.filter((s) => s.status === statusFilter);
+              return filtered.length > 0 ? (
+                filtered.map((show) => (
+                  <div key={show.showId} className={removingId === show.showId ? 'opacity-50 pointer-events-none' : ''}>
+                    <MovieCard
+                      show={show}
+                      onRemove={() => handleRemove(show.showId)}
+                    />
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-16">
+                  <p className="text-gray-400 text-sm">Nenhum filme encontrado com este filtro.</p>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

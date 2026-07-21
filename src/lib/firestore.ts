@@ -14,8 +14,8 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { TVShow } from './tvmaze';
-import type { MovieDetails } from './omdb';
+import type { TVShow } from './tmdb';
+import type { TMDBMovieDetail } from './tmdb';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -47,6 +47,7 @@ export interface UserShow {
   totalSeasons: number;
   isFavorite: boolean;
   genres?: string[];
+  source?: 'tvmaze' | 'tmdb';
 }
 
 export interface WatchedEpisode {
@@ -129,20 +130,21 @@ export const addShowToWatchlist = async (
     lastWatchedAt: null,
     isFavorite: false,
     genres: show.genres?.map((g) => g.name) ?? [],
+    source: 'tmdb',
   } satisfies Omit<UserShow, 'addedAt' | 'lastWatchedAt'> & { addedAt: any; lastWatchedAt: any });
 };
 
 export const addMovieToWatchlist = async (
   uid: string,
-  movie: MovieDetails,
+  movie: TMDBMovieDetail,
   status: ShowStatus = 'plan_to_watch'
 ): Promise<void> => {
-  const ref = doc(db, 'users', uid, 'userShows', movie.imdbID);
+  const ref = doc(db, 'users', uid, 'userShows', String(movie.id));
   await setDoc(ref, {
-    showId: movie.imdbID,
-    title: movie.Title,
-    posterPath: movie.Poster !== 'N/A' ? movie.Poster : null,
-    backdropPath: movie.Poster !== 'N/A' ? movie.Poster : null,
+    showId: String(movie.id),
+    title: movie.title,
+    posterPath: movie.poster_path,
+    backdropPath: movie.backdrop_path,
     status,
     mediaType: 'movie',
     totalEpisodes: 1,
@@ -151,7 +153,8 @@ export const addMovieToWatchlist = async (
     addedAt: serverTimestamp(),
     lastWatchedAt: null,
     isFavorite: false,
-    genres: movie.Genre !== 'N/A' ? movie.Genre.split(', ').map((g) => g.trim()) : [],
+    genres: movie.genres.map((g) => g.name),
+    source: 'tmdb',
   } satisfies Omit<UserShow, 'addedAt' | 'lastWatchedAt'> & { addedAt: any; lastWatchedAt: any });
 };
 

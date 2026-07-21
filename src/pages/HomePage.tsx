@@ -5,8 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { subscribeToUserShows, setBannerShow, getBannerUrl, type UserShow } from '../lib/firestore';
 import { formatWatchTimeShort } from '../lib/format';
 import BannerPickerModal from '../components/BannerPickerModal';
-import { getRecommendedShows, getPosterUrl, type TVShow } from '../lib/tvmaze';
-import { getRecommendedMovies, type MovieDetails } from '../lib/omdb';
+import { getTrendingTVShows, getTrendingMovies, getPosterUrl, type TVShow, type TMDBMovieSimple } from '../lib/tmdb';
 
 const StarIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-yellow-400">
@@ -76,15 +75,15 @@ const ShowCard = ({ show }: { show: TVShow }) => {
   );
 };
 
-const MovieCard = ({ movie }: { movie: MovieDetails }) => {
-  const posterUrl = movie.Poster !== 'N/A' ? movie.Poster : null;
+const MovieCard = ({ movie }: { movie: TMDBMovieSimple }) => {
+  const posterUrl = getPosterUrl(movie.poster_path, 'w342');
   return (
-    <Link to={`/movie/${movie.imdbID}`} className="card-hover group block">
+    <Link to={`/movie/${movie.id}`} className="card-hover group block">
       <div className="aspect-[2/3] rounded-xl overflow-hidden bg-dark-600 relative">
         {posterUrl ? (
           <img
             src={posterUrl}
-            alt={movie.Title}
+            alt={movie.title}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.classList.add('flex', 'items-center', 'justify-center'); }}
@@ -100,14 +99,14 @@ const MovieCard = ({ movie }: { movie: MovieDetails }) => {
         <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-dark-900/80 rounded-full px-2 py-0.5">
           <StarIcon />
           <span className="text-[10px] text-white font-medium">
-            {movie.imdbRating !== 'N/A' ? parseFloat(movie.imdbRating).toFixed(1) : '–'}
+            {movie.vote_average ? movie.vote_average.toFixed(1) : '–'}
           </span>
         </div>
       </div>
       <div className="p-2">
-        <p className="text-xs font-medium text-white truncate">{movie.Title}</p>
+        <p className="text-xs font-medium text-white truncate">{movie.title}</p>
         <p className="text-[10px] text-gray-500">
-          {movie.Year !== 'N/A' ? movie.Year : ''}
+          {movie.release_date ? new Date(movie.release_date).getFullYear() : ''}
         </p>
       </div>
     </Link>
@@ -152,33 +151,20 @@ const HomePage: React.FC = () => {
   const { user, userProfile } = useAuth();
   const [userShows, setUserShows] = useState<UserShow[]>([]);
 
-  // Derive the user's preferred genres (by frequency across their shows).
-  const preferredGenres = (() => {
-    const counts = new Map<string, number>();
-    for (const s of userShows) {
-      for (const g of s.genres ?? []) {
-        counts.set(g, (counts.get(g) ?? 0) + 1);
-      }
-    }
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([g]) => g);
-  })();
-
   const { data: recommendedData, isLoading: trendingLoading } = useQuery({
-    queryKey: ['recommended', preferredGenres.join(',')],
-    queryFn: () => getRecommendedShows(preferredGenres, 20),
+    queryKey: ['recommended'],
+    queryFn: () => getTrendingTVShows(),
   });
 
   const { data: recommendedMovies, isLoading: moviesLoading } = useQuery({
     queryKey: ['recommended-movies'],
-    queryFn: () => getRecommendedMovies(10),
+    queryFn: () => getTrendingMovies(),
     staleTime: 3600000,
   });
 
   const weekSeed = getWeekSeed();
-  const recommended = recommendedData?.results
-    ? seededShuffle(recommendedData.results, weekSeed).slice(0, 10)
+  const recommended = recommendedData
+    ? seededShuffle(recommendedData, weekSeed).slice(0, 10)
     : [];
 
   useEffect(() => {
@@ -335,7 +321,7 @@ const HomePage: React.FC = () => {
         )}
       </section>
 
-      <section>
+      <section className="mt-8">
         <h2 className="section-title mb-4">Filmes recomendados</h2>
         {moviesLoading ? (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
@@ -351,8 +337,8 @@ const HomePage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {recommendedMovies?.map((movie: MovieDetails) => (
-              <MovieCard key={movie.imdbID} movie={movie} />
+            {recommendedMovies?.map((movie: TMDBMovieSimple) => (
+              <MovieCard key={movie.id} movie={movie} />
             ))}
           </div>
         )}

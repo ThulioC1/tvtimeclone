@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { getMovieDetails } from '../lib/omdb';
+import { getMovieDetails as tmdbGetMovieDetails, getMovieVideos, getPosterUrl, getBackdropUrl, type TMDBMovieDetail } from '../lib/tmdb';
+import { getMovieDetails as omdbGetMovieDetails } from '../lib/omdb';
 import {
   addMovieToWatchlist,
   removeShowFromWatchlist,
@@ -14,7 +15,6 @@ import {
   type UserShow,
   type ShowStatus,
 } from '../lib/firestore';
-import { getYouTubeTrailer } from '../lib/youtube';
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -46,48 +46,107 @@ const MovieDetailPage: React.FC = () => {
   const [isFav, setIsFav] = useState(false);
   const [watchedLoading, setWatchedLoading] = useState(false);
 
-  const showId = id ?? '';
+  const movieId = id ?? '';
+  const isImdbId = movieId.startsWith('tt');
 
   const { data: movie, isLoading } = useQuery({
-    queryKey: ['movie', showId],
-    queryFn: () => getMovieDetails(showId),
-    enabled: !!showId,
+    queryKey: ['movie', movieId],
+    queryFn: async () => {
+      if (isImdbId) {
+        const omdb = await omdbGetMovieDetails(movieId);
+        return {
+          id: 0,
+          title: omdb.Title,
+          release_date: omdb.Year !== 'N/A' ? omdb.Year : '',
+          runtime: omdb.Runtime !== 'N/A' ? parseInt(omdb.Runtime) || null : null,
+          genres: omdb.Genre !== 'N/A' ? omdb.Genre.split(', ').map((n, i) => ({ id: i, name: n })) : [],
+          overview: omdb.Plot !== 'N/A' ? omdb.Plot : '',
+          poster_path: omdb.Poster !== 'N/A' ? omdb.Poster : null,
+          backdrop_path: omdb.Poster !== 'N/A' ? omdb.Poster : null,
+          vote_average: omdb.imdbRating !== 'N/A' ? parseFloat(omdb.imdbRating) : 0,
+          vote_count: 0,
+          imdb_id: omdb.imdbID,
+          director: omdb.Director !== 'N/A' ? omdb.Director : '',
+          writers: omdb.Writer !== 'N/A' ? omdb.Writer.split(', ').map((w) => w.trim()) : [],
+          actors: omdb.Actors !== 'N/A' ? omdb.Actors.split(', ').map((n) => ({ name: n.trim(), character: '' })) : [],
+          production_companies: omdb.Production !== 'N/A' ? [omdb.Production] : [],
+          tagline: '',
+          status: '',
+          budget: 0,
+          revenue: 0,
+        } as TMDBMovieDetail;
+      }
+      return tmdbGetMovieDetails(Number(movieId));
+    },
+    enabled: !!movieId,
   });
 
   useEffect(() => {
-    if (!user || !showId) return;
+    if (!user || !movieId) return;
     const unsub = subscribeToUserShows(user.uid, (shows) => {
-      const found = shows.find((s) => s.showId === showId) ?? null;
+      const found = shows.find((s) => s.showId === movieId) ?? null;
       setUserShow(found);
       setIsFav(found?.isFavorite ?? false);
     });
     return () => { unsub(); };
-  }, [user, showId]);
+  }, [user, movieId]);
 
   useEffect(() => {
     if (!movie) return;
     let cancelled = false;
-    getYouTubeTrailer(movie.Title).then((id) => {
-      if (!cancelled) setTrailerId(id);
-    });
+    if (movie.id > 0) {
+      getMovieVideos(movie.id).then((videos) => {
+        if (!cancelled) {
+          const trailer = videos.find((v) => v.key) ?? null;
+          if (trailer) setTrailerId(trailer.key);
+        }
+      });
+    } else {
+      import('../lib/youtube').then(({ getYouTubeTrailer }) => {
+        getYouTubeTrailer(movie.title).then((id) => {
+          if (!cancelled) setTrailerId(id);
+        });
+      });
+    }
     return () => { cancelled = true; };
   }, [movie]);
 
   const handleAddToList = async () => {
     if (!user || !movie) return;
-    await addMovieToWatchlist(user.uid, movie);
+    if (isImdbId) {
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const { db } = await import('../lib/firebase');
+      const ref = doc(db, 'users', user.uid, 'userShows', movieId);
+      await setDoc(ref, {
+        showId: movieId,
+        title: movie.title,
+        posterPath: movie.poster_path,
+        backdropPath: movie.backdrop_path,
+        status: 'plan_to_watch' as const,
+        mediaType: 'movie' as const,
+        totalEpisodes: 1,
+        totalSeasons: 0,
+        watchedCount: 0,
+        addedAt: serverTimestamp(),
+        lastWatchedAt: null,
+        isFavorite: false,
+        genres: movie.genres.map((g) => g.name),
+      });
+    } else {
+      await addMovieToWatchlist(user.uid, movie);
+    }
   };
 
   const handleRemoveFromList = async () => {
     if (!user) return;
-    await removeShowFromWatchlist(user.uid, showId as any);
+    await removeShowFromWatchlist(user.uid, movieId);
   };
 
   const handleStatusChange = async (status: ShowStatus) => {
     if (!user) return;
     setStatusUpdating(true);
     try {
-      await updateShowStatus(user.uid, showId as any, status);
+      await updateShowStatus(user.uid, movieId, status);
     } finally {
       setStatusUpdating(false);
     }
@@ -98,7 +157,7 @@ const MovieDetailPage: React.FC = () => {
     const next = !isFav;
     setIsFav(next);
     try {
-      await toggleFavorite(user.uid, showId as any, next);
+      await toggleFavorite(user.uid, movieId, next);
     } catch {
       setIsFav(!next);
     }
@@ -108,7 +167,7 @@ const MovieDetailPage: React.FC = () => {
     if (!user) return;
     setWatchedLoading(true);
     try {
-      const ref = doc(db, 'users', user.uid, 'userShows', showId);
+      const ref = doc(db, 'users', user.uid, 'userShows', movieId);
       if (userShow && userShow.watchedCount > 0) {
         await updateDoc(ref, { watchedCount: 0, lastWatchedAt: null });
       } else {
@@ -135,31 +194,26 @@ const MovieDetailPage: React.FC = () => {
     );
   }
 
-  const posterUrl = movie.Poster !== 'N/A' ? movie.Poster : null;
+  const backdropUrl = getBackdropUrl(movie.backdrop_path, 'w1280');
+  const posterUrl = getPosterUrl(movie.poster_path, 'w342');
   const isInList = !!userShow;
-  const imdbRating = movie.imdbRating !== 'N/A' ? parseFloat(movie.imdbRating) : 0;
-  const year = movie.Year !== 'N/A' ? movie.Year : '';
-  const runtime = movie.Runtime !== 'N/A' ? movie.Runtime : '';
-  const genre = movie.Genre !== 'N/A' ? movie.Genre : '';
-  const director = movie.Director !== 'N/A' ? movie.Director : '';
-  const actors = movie.Actors !== 'N/A' ? movie.Actors : '';
-  const awards = movie.Awards !== 'N/A' ? movie.Awards : '';
-  const plot = movie.Plot !== 'N/A' ? movie.Plot : '';
-  const rated = movie.Rated !== 'N/A' ? movie.Rated : '';
+  const year = movie.release_date ? new Date(movie.release_date).getFullYear() : '';
+  const runtime = movie.runtime ? `${movie.runtime} min` : '';
+  const genreStr = movie.genres.map((g) => g.name).join(', ');
 
   return (
     <div className="max-w-3xl mx-auto">
       <div className="relative h-60 md:h-80 overflow-hidden">
-        {posterUrl ? (
+        {backdropUrl ? (
           <img
-            src={posterUrl}
-            alt={movie.Title}
+            src={backdropUrl}
+            alt={movie.title}
             loading="lazy"
             className="w-full h-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.querySelector('.hero-fallback')?.classList.remove('hidden'); }}
           />
-        ) : null}
-        <div className={`hero-fallback ${posterUrl ? 'hidden' : ''} absolute inset-0 bg-gradient-to-br from-dark-600 to-dark-800`} />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-dark-600 to-dark-800" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/50 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-dark-900/70 to-transparent" />
         <button
@@ -176,7 +230,7 @@ const MovieDetailPage: React.FC = () => {
             {posterUrl ? (
               <img
                 src={posterUrl}
-                alt={movie.Title}
+                alt={movie.title}
                 loading="lazy"
                 className="w-full h-full object-cover"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.classList.add('bg-dark-500'); }}
@@ -187,23 +241,20 @@ const MovieDetailPage: React.FC = () => {
           </div>
 
           <div className="pt-16 md:pt-20 flex-1 min-w-0">
-            <h1 className="text-2xl md:text-3xl font-extrabold text-white leading-tight tracking-tight drop-shadow">{movie.Title}</h1>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-white leading-tight tracking-tight drop-shadow">{movie.title}</h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-400">
               {year && <span>{year}</span>}
               {runtime && <span>{runtime}</span>}
-              {imdbRating > 0 && (
+              {movie.vote_average > 0 && (
                 <span className="flex items-center gap-1">
-                  <StarIcon /> {imdbRating.toFixed(1)}
+                  <StarIcon /> {movie.vote_average.toFixed(1)}
                 </span>
               )}
-              {rated && (
-                <span className="badge bg-gray-500/20 text-gray-400">{rated}</span>
-              )}
             </div>
-            {genre && (
+            {genreStr && (
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {genre.split(', ').map((g) => (
-                  <span key={g} className="badge bg-brand-500/10 text-brand-400 text-xs">{g}</span>
+                {movie.genres.map((g) => (
+                  <span key={g.id} className="badge bg-brand-500/10 text-brand-400 text-xs">{g.name}</span>
                 ))}
               </div>
             )}
@@ -285,14 +336,14 @@ const MovieDetailPage: React.FC = () => {
           </div>
         )}
 
-        {imdbRating > 0 && (
+        {movie.vote_average > 0 && (
           <div className="card p-4 mt-4 flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-yellow-400/10 flex items-center justify-center shrink-0">
               <StarIcon />
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">IMDb Rating</p>
-              <p className="text-xs text-gray-400">{imdbRating.toFixed(1)}/10</p>
+              <p className="text-sm font-semibold text-white">Avaliação</p>
+              <p className="text-xs text-gray-400">{movie.vote_average.toFixed(1)}/10</p>
             </div>
           </div>
         )}
@@ -304,7 +355,7 @@ const MovieDetailPage: React.FC = () => {
               <iframe
                 className="absolute inset-0 w-full h-full"
                 src={`https://www.youtube.com/embed/${trailerId}`}
-                title={`Trailer de ${movie.Title}`}
+                title={`Trailer de ${movie.title}`}
                 frameBorder={0}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -313,30 +364,44 @@ const MovieDetailPage: React.FC = () => {
           </div>
         )}
 
-        {plot && (
+        {movie.tagline && (
+          <div className="mt-5">
+            <p className="text-sm text-gray-400 italic">"{movie.tagline}"</p>
+          </div>
+        )}
+
+        {movie.overview && (
           <div className="mt-5">
             <h2 className="section-title mb-2">Sinopse</h2>
-            <p className="text-gray-300 text-sm leading-relaxed">{plot}</p>
+            <p className="text-gray-300 text-sm leading-relaxed">{movie.overview}</p>
           </div>
         )}
 
         <div className="mt-5 space-y-3">
-          {director && (
+          {movie.director && (
             <div>
               <h3 className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Diretor</h3>
-              <p className="text-sm text-white">{director}</p>
+              <p className="text-sm text-white">{movie.director}</p>
             </div>
           )}
-          {actors && (
+          {movie.writers.length > 0 && (
+            <div>
+              <h3 className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Roteiristas</h3>
+              <p className="text-sm text-white">{movie.writers.join(', ')}</p>
+            </div>
+          )}
+          {movie.actors.length > 0 && (
             <div>
               <h3 className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Elenco</h3>
-              <p className="text-sm text-white">{actors}</p>
+              <p className="text-sm text-white">
+                {movie.actors.slice(0, 8).map((a) => a.name).join(', ')}
+              </p>
             </div>
           )}
-          {awards && (
+          {movie.production_companies.length > 0 && (
             <div>
-              <h3 className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Prêmios</h3>
-              <p className="text-sm text-white">{awards}</p>
+              <h3 className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Produção</h3>
+              <p className="text-sm text-white">{movie.production_companies.join(', ')}</p>
             </div>
           )}
         </div>

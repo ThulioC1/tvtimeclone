@@ -1,5 +1,5 @@
 import React from 'react';
-import { getPosterUrl } from '../lib/tvmaze';
+import { getPosterUrl } from '../lib/tmdb';
 import { getBannerUrl, type UserShow } from '../lib/firestore';
 
 interface Props {

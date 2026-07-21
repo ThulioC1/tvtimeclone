@@ -3,13 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import {
-  getShowDetails,
-  getSeasonDetails,
+  getTVShowDetails as tmdbGetShowDetails,
+  getTVSeason as tmdbGetSeason,
   getPosterUrl,
   getBackdropUrl,
+  getTVVideos,
   type TVSeason,
   type TVEpisode,
-} from '../lib/tvmaze';
+} from '../lib/tmdb';
+import { getShowDetails as tvmazeGetShowDetails, getSeasonDetails as tvmazeGetSeason } from '../lib/tvmaze';
 import {
   addShowToWatchlist,
   removeShowFromWatchlist,
@@ -28,7 +30,7 @@ import {
   type ShowStatus,
   updateShowStatus,
 } from '../lib/firestore';
-import { getYouTubeTrailer } from '../lib/youtube';
+
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -307,7 +309,10 @@ const SeasonEpisodes = ({
 }) => {
   const { data: seasonData, isLoading } = useQuery({
     queryKey: ['season', showId, season.season_number],
-    queryFn: () => getSeasonDetails(showId, season.season_number),
+    queryFn: async () => {
+      try { return await tmdbGetSeason(showId, season.season_number); }
+      catch { return tvmazeGetSeason(showId, season.season_number); }
+    },
   });
 
   const episodes = seasonData?.episodes ?? [];
@@ -401,7 +406,10 @@ const SeasonAccordion = ({
 }) => {
   const { data: seasonData, isLoading } = useQuery({
     queryKey: ['season', showId, season.season_number],
-    queryFn: () => getSeasonDetails(showId, season.season_number),
+    queryFn: async () => {
+      try { return await tmdbGetSeason(showId, season.season_number); }
+      catch { return tvmazeGetSeason(showId, season.season_number); }
+    },
     enabled: open,
   });
 
@@ -490,6 +498,7 @@ const ShowDetailPage: React.FC = () => {
   const [watchedEpisodes, setWatchedEpisodes] = useState<Set<string>>(new Set());
   const [watchedDocs, setWatchedDocs] = useState<Map<string, { watchedAt: Date | null; runtime?: number }>>(new Map());
   const [userShow, setUserShow] = useState<UserShow | null>(null);
+  const [userShowsLoaded, setUserShowsLoaded] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [trailerId, setTrailerId] = useState<string | null>(null);
@@ -503,9 +512,18 @@ const ShowDetailPage: React.FC = () => {
   const [openEpisode, setOpenEpisode] = useState<TVEpisode | null>(null);
 
   const { data: show, isLoading } = useQuery({
-    queryKey: ['show', showId],
-    queryFn: () => getShowDetails(showId),
-    enabled: !!showId,
+    queryKey: ['show', showId, userShow?.source],
+    queryFn: async () => {
+      if (userShow && userShow.source !== 'tmdb') {
+        return tvmazeGetShowDetails(showId);
+      }
+      try {
+        return await tmdbGetShowDetails(showId);
+      } catch {
+        return tvmazeGetShowDetails(showId);
+      }
+    },
+    enabled: !!showId && userShowsLoaded,
   });
 
   useEffect(() => {
@@ -515,9 +533,10 @@ const ShowDetailPage: React.FC = () => {
       setWatchedEpisodes(new Set(docs.keys()));
     });
     const unsub2 = subscribeToUserShows(user.uid, (shows) => {
-      const found = shows.find((s) => s.showId === showId) ?? null;
+      const found = shows.find((s) => String(s.showId) === String(showId)) ?? null;
       setUserShow(found);
       setIsFav(found?.isFavorite ?? false);
+      setUserShowsLoaded(true);
     });
     return () => { unsub1(); unsub2(); };
   }, [user, showId]);
@@ -525,8 +544,11 @@ const ShowDetailPage: React.FC = () => {
   useEffect(() => {
     if (!show) return;
     let cancelled = false;
-    getYouTubeTrailer(show.name).then((id) => {
-      if (!cancelled) setTrailerId(id);
+    getTVVideos(show.id).then((videos) => {
+      if (!cancelled) {
+        const trailer = videos.find((v) => v.key) ?? null;
+        if (trailer) setTrailerId(trailer.key);
+      }
     });
     return () => { cancelled = true; };
   }, [show]);
@@ -599,7 +621,9 @@ const ShowDetailPage: React.FC = () => {
       const episodes: { seasonNumber: number; episodeNumber: number; runtime?: number | null }[] = [];
       for (const season of show.seasons ?? []) {
         if (season.season_number <= 0) continue;
-        const data = await getSeasonDetails(showId, season.season_number);
+        let data;
+        try { data = await tmdbGetSeason(showId, season.season_number); }
+        catch { data = await tvmazeGetSeason(showId, season.season_number); }
         for (const ep of data.episodes ?? []) {
           episodes.push({
             seasonNumber: ep.season_number,
@@ -629,7 +653,9 @@ const ShowDetailPage: React.FC = () => {
   const handleMarkSeason = async (seasonNumber: number) => {
     if (!user || !show) return;
     try {
-      const data = await getSeasonDetails(showId, seasonNumber);
+      let data;
+      try { data = await tmdbGetSeason(showId, seasonNumber); }
+      catch { data = await tvmazeGetSeason(showId, seasonNumber); }
       const episodes = (data.episodes ?? []).map((ep) => ({
         seasonNumber: ep.season_number,
         episodeNumber: ep.episode_number,

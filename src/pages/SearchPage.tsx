@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { searchShows, getShowDetails, getPosterUrl, type TVShow } from '../lib/tvmaze';
-import { searchMovies, type MovieDetails } from '../lib/omdb';
+import { searchTVShows, searchMovies, getTVShowDetails, getMovieDetails, getPosterUrl, type TVShow, type TMDBMovieSimple } from '../lib/tmdb';
 import { addShowToWatchlist, addMovieToWatchlist, getUserShows } from '../lib/firestore';
 
 const useDebounce = (value: string, delay: number) => {
@@ -47,7 +46,7 @@ const SearchPage: React.FC = () => {
 
   const seriesQuery = useQuery({
     queryKey: ['search', 'series', debouncedQuery],
-    queryFn: () => searchShows(debouncedQuery),
+    queryFn: () => searchTVShows(debouncedQuery),
     enabled: debouncedQuery.trim().length >= 2 && mode === 'series',
   });
 
@@ -61,7 +60,7 @@ const SearchPage: React.FC = () => {
   const data = mode === 'series' ? seriesQuery.data : moviesQuery.data;
   const results = mode === 'series'
     ? (data as TVShow[] | undefined) ?? []
-    : (data as MovieDetails[] | undefined) ?? [];
+    : (data as TMDBMovieSimple[] | undefined) ?? [];
 
   useEffect(() => {
     if (!user) return;
@@ -78,7 +77,7 @@ const SearchPage: React.FC = () => {
     if (!user || addedIds.has(show.id)) return;
     setAddingId(show.id);
     try {
-      const details = await getShowDetails(show.id);
+      const details = await getTVShowDetails(show.id);
       const showToAdd = details.seasons && details.seasons.length > 0 ? details : show;
       await addShowToWatchlist(user.uid, showToAdd, 'watching');
       setAddedIds((prev) => new Set([...prev, show.id]));
@@ -90,13 +89,14 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  const handleAddMovie = async (movie: MovieDetails) => {
-    if (!user || addedIds.has(movie.imdbID)) return;
-    setAddingId(movie.imdbID);
+  const handleAddMovie = async (movie: TMDBMovieSimple) => {
+    if (!user || addedIds.has(movie.id)) return;
+    setAddingId(movie.id);
     try {
-      await addMovieToWatchlist(user.uid, movie);
-      setAddedIds((prev) => new Set([...prev, movie.imdbID]));
-      navigate(`/movie/${movie.imdbID}`);
+      const details = await getMovieDetails(movie.id);
+      await addMovieToWatchlist(user.uid, details);
+      setAddedIds((prev) => new Set([...prev, movie.id]));
+      navigate(`/movie/${movie.id}`);
     } catch (err) {
       console.error('Erro ao adicionar filme:', err);
     } finally {
@@ -235,22 +235,22 @@ const SearchPage: React.FC = () => {
       )}
 
       {/* Results - Movies */}
-      {!isLoading && showResults && mode === 'movies' && (results as MovieDetails[]).length > 0 && (
+      {!isLoading && showResults && mode === 'movies' && (results as TMDBMovieSimple[]).length > 0 && (
         <div className="animation-fade-in">
           <p className="text-muted mb-3">{results.length} resultados para "{debouncedQuery}"</p>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {(results as MovieDetails[]).map((movie) => {
-              const posterUrl = movie.Poster !== 'N/A' ? movie.Poster : null;
-              const isAdded = addedIds.has(movie.imdbID);
-              const isAdding = addingId === movie.imdbID;
+            {(results as TMDBMovieSimple[]).map((movie) => {
+              const posterUrl = getPosterUrl(movie.poster_path, 'w185');
+              const isAdded = addedIds.has(movie.id);
+              const isAdding = addingId === movie.id;
               return (
-                <div key={movie.imdbID} className="card-hover group relative block">
-                  <Link to={`/movie/${movie.imdbID}`} className="block">
+                <div key={movie.id} className="card-hover group relative block">
+                  <Link to={`/movie/${movie.id}`} className="block">
                     <div className="aspect-[2/3] rounded-xl overflow-hidden bg-dark-600 relative">
                       {posterUrl ? (
                         <img
                           src={posterUrl}
-                          alt={movie.Title}
+                          alt={movie.title}
                           loading="lazy"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.querySelector('.fallback')?.classList.remove('hidden'); }}
@@ -261,11 +261,15 @@ const SearchPage: React.FC = () => {
                           <rect x="2" y="3" width="20" height="14" rx="2" />
                         </svg>
                       </div>
+                      <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-dark-900/80 rounded-full px-2 py-0.5">
+                        <StarIcon />
+                        <span className="text-[10px] text-white font-medium">{movie.vote_average ? movie.vote_average.toFixed(1) : '–'}</span>
+                      </div>
                     </div>
                     <div className="p-2">
-                      <p className="text-xs font-medium text-white truncate">{movie.Title}</p>
+                      <p className="text-xs font-medium text-white truncate">{movie.title}</p>
                       <p className="text-[10px] text-gray-500">
-                        {movie.Year !== 'N/A' ? movie.Year : ''}
+                        {movie.release_date ? new Date(movie.release_date).getFullYear() : ''}
                       </p>
                     </div>
                   </Link>
