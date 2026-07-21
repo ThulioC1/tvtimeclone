@@ -24,7 +24,21 @@ const UserIcon = ({ filled }: { filled?: boolean }) => (
   </svg>
 );
 
-const AppLogo = () => <img src="/favicon.svg" alt="Time to Watch" className="w-8 h-8" />;
+const AppLogo = () => (
+  <svg viewBox="0 0 512 512" className="w-9 h-9" fill="none">
+    <defs>
+      <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#6366f1"/>
+        <stop offset="1" stop-color="#a855f7"/>
+      </linearGradient>
+    </defs>
+    <rect width="512" height="512" rx="112" fill="#0b0d12"/>
+    <circle cx="256" cy="256" r="150" stroke="url(#lg)" strokeWidth="26"/>
+    <line x1="256" y1="256" x2="256" y2="166" stroke="url(#lg)" strokeWidth="26" strokeLinecap="round"/>
+    <line x1="256" y1="256" x2="330" y2="290" stroke="url(#lg)" strokeWidth="26" strokeLinecap="round"/>
+    <path d="M226 340 L226 392 L300 370 Z" fill="url(#lg)"/>
+  </svg>
+);
 
 const navItems = [
   { to: '/', label: 'Início', Icon: HomeIcon, end: true },
@@ -42,9 +56,7 @@ const AppLayout: React.FC = () => {
       <aside className="hidden md:flex flex-col w-64 bg-dark-800 border-r border-dark-500 shrink-0">
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-6 border-b border-dark-500">
-          <div className="p-2 bg-brand-600 rounded-xl text-white">
-            <AppLogo />
-          </div>
+          <AppLogo />
           <span className="text-xl font-bold gradient-text">Time to Watch</span>
         </div>
 
