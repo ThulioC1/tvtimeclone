@@ -29,7 +29,12 @@ import {
   type UserShow,
   type ShowStatus,
   updateShowStatus,
+  submitRating,
+  getUserRating,
+  subscribeToMediaRatings,
 } from '../lib/firestore';
+import DisqusComments from '../components/DisqusComments';
+import RatingStars from '../components/RatingStars';
 
 
 const BackIcon = () => (
@@ -510,6 +515,9 @@ const ShowDetailPage: React.FC = () => {
   });
   const [markingAll, setMarkingAll] = useState(false);
   const [openEpisode, setOpenEpisode] = useState<TVEpisode | null>(null);
+  const [userRating, setUserRating] = useState(0);
+  const [avgRating, setAvgRating] = useState(0);
+  const [ratingCount, setRatingCount] = useState(0);
 
   const { data: show, isLoading } = useQuery({
     queryKey: ['show', showId, userShow?.source],
@@ -552,6 +560,26 @@ const ShowDetailPage: React.FC = () => {
     });
     return () => { cancelled = true; };
   }, [show]);
+
+  useEffect(() => {
+    if (!show || show.id === 0) return;
+    const unsub = subscribeToMediaRatings(show.id, 'tv', (data) => {
+      setAvgRating(data.average);
+      setRatingCount(data.count);
+    });
+    return unsub;
+  }, [show]);
+
+  useEffect(() => {
+    if (!user || !show || show.id === 0) return;
+    getUserRating(user.uid, show.id, 'tv').then((r) => setUserRating(r ?? 0));
+  }, [user, show]);
+
+  const handleRate = async (rating: number) => {
+    if (!user || !show || show.id === 0) return;
+    setUserRating(rating);
+    await submitRating(user.uid, user.displayName || 'Anônimo', user.photoURL, show.id, 'tv', rating);
+  };
 
   const handleAddToList = async () => {
     if (!user || !show) return;
@@ -987,6 +1015,34 @@ const ShowDetailPage: React.FC = () => {
               );
             }}
           />
+        )}
+
+        {/* ── Ratings ───────────────────────────────────────────────────── */}
+        {show && show.id > 0 && (
+          <div className="card p-4 mt-5">
+            <h3 className="section-title mb-3">Avaliação</h3>
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col items-center">
+                <p className="text-xs text-gray-400 mb-1">Sua nota</p>
+                <RatingStars
+                  value={userRating}
+                  onChange={user ? handleRate : undefined}
+                  size="lg"
+                />
+              </div>
+              {avgRating > 0 && (
+                <div className="flex flex-col items-center">
+                  <p className="text-xs text-gray-400 mb-1">Média</p>
+                  <RatingStars value={avgRating} size="lg" count={ratingCount} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Comments ──────────────────────────────────────────────────── */}
+        {show && show.id > 0 && (
+          <DisqusComments mediaId={show.id} mediaType="tv" title={show.name} />
         )}
       </div>
     </div>

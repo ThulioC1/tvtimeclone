@@ -7,6 +7,9 @@ export default defineConfig({
     port: 5173,
     host: true,
   },
+  optimizeDeps: {
+    include: ['disqus-react'],
+  },
   build: {
     chunkSizeWarningLimit: 800,
     rollupOptions: {

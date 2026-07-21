@@ -546,6 +546,82 @@ export interface WatchedEpisodeDoc {
   runtime?: number;
 }
 
+// ── Ratings ────────────────────────────────────────────────────────────────────
+
+export interface UserRating {
+  userId: string;
+  userName: string;
+  userPhotoURL: string | null;
+  mediaId: number;
+  mediaType: 'movie' | 'tv';
+  rating: number; // 1-5
+  createdAt: Date;
+}
+
+export const submitRating = async (
+  userId: string,
+  userName: string,
+  userPhotoURL: string | null,
+  mediaId: number,
+  mediaType: 'movie' | 'tv',
+  rating: number
+): Promise<void> => {
+  const id = `${userId}_${mediaType}_${mediaId}`;
+  const ref = doc(db, 'ratings', id);
+  await setDoc(ref, {
+    userId,
+    userName,
+    userPhotoURL,
+    mediaId,
+    mediaType,
+    rating,
+    createdAt: serverTimestamp(),
+  });
+};
+
+export const getUserRating = async (
+  userId: string,
+  mediaId: number,
+  mediaType: 'movie' | 'tv'
+): Promise<number | null> => {
+  const id = `${userId}_${mediaType}_${mediaId}`;
+  const snap = await getDoc(doc(db, 'ratings', id));
+  if (!snap.exists()) return null;
+  return (snap.data() as UserRating).rating;
+};
+
+export const getMediaRatings = async (
+  mediaId: number,
+  mediaType: 'movie' | 'tv'
+): Promise<{ ratings: UserRating[]; average: number; count: number }> => {
+  const snap = await getDocs(collection(db, 'ratings'));
+  const filtered = snap.docs
+    .map((d) => d.data() as UserRating)
+    .filter((r) => r.mediaId === mediaId && r.mediaType === mediaType);
+  const count = filtered.length;
+  const average = count > 0
+    ? Math.round(filtered.reduce((s, r) => s + r.rating, 0) / count * 10) / 10
+    : 0;
+  return { ratings: filtered, average, count };
+};
+
+export const subscribeToMediaRatings = (
+  mediaId: number,
+  mediaType: 'movie' | 'tv',
+  callback: (data: { ratings: UserRating[]; average: number; count: number }) => void
+): Unsubscribe => {
+  return onSnapshot(collection(db, 'ratings'), (snap) => {
+    const filtered = snap.docs
+      .map((d) => d.data() as UserRating)
+      .filter((r) => r.mediaId === mediaId && r.mediaType === mediaType);
+    const count = filtered.length;
+    const average = count > 0
+      ? Math.round(filtered.reduce((s, r) => s + r.rating, 0) / count * 10) / 10
+      : 0;
+    callback({ ratings: filtered, average, count });
+  });
+};
+
 export const subscribeToWatchedEpisodeDocs = (
   uid: string,
   showId: number,

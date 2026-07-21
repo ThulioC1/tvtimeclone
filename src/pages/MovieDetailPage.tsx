@@ -12,9 +12,14 @@ import {
   updateShowStatus,
   toggleFavorite,
   subscribeToUserShows,
+  submitRating,
+  getUserRating,
+  subscribeToMediaRatings,
   type UserShow,
   type ShowStatus,
 } from '../lib/firestore';
+import DisqusComments from '../components/DisqusComments';
+import RatingStars from '../components/RatingStars';
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -45,6 +50,9 @@ const MovieDetailPage: React.FC = () => {
   const [trailerId, setTrailerId] = useState<string | null>(null);
   const [isFav, setIsFav] = useState(false);
   const [watchedLoading, setWatchedLoading] = useState(false);
+  const [userRating, setUserRating] = useState<number>(0);
+  const [avgRating, setAvgRating] = useState(0);
+  const [ratingCount, setRatingCount] = useState(0);
 
   const movieId = id ?? '';
   const isImdbId = movieId.startsWith('tt');
@@ -110,6 +118,26 @@ const MovieDetailPage: React.FC = () => {
     }
     return () => { cancelled = true; };
   }, [movie]);
+
+  useEffect(() => {
+    if (!movie || movie.id === 0) return;
+    const unsub = subscribeToMediaRatings(movie.id, 'movie', (data) => {
+      setAvgRating(data.average);
+      setRatingCount(data.count);
+    });
+    return unsub;
+  }, [movie]);
+
+  useEffect(() => {
+    if (!user || !movie || movie.id === 0) return;
+    getUserRating(user.uid, movie.id, 'movie').then((r) => setUserRating(r ?? 0));
+  }, [user, movie]);
+
+  const handleRate = async (rating: number) => {
+    if (!user || !movie || movie.id === 0) return;
+    setUserRating(rating);
+    await submitRating(user.uid, user.displayName || 'Anônimo', user.photoURL, movie.id, 'movie', rating);
+  };
 
   const handleAddToList = async () => {
     if (!user || !movie) return;
@@ -405,6 +433,34 @@ const MovieDetailPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* ── Ratings ───────────────────────────────────────────────────── */}
+        {movie.id > 0 && (
+          <div className="card p-4 mt-5">
+            <h3 className="section-title mb-3">Avaliação</h3>
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col items-center">
+                <p className="text-xs text-gray-400 mb-1">Sua nota</p>
+                <RatingStars
+                  value={userRating}
+                  onChange={user ? handleRate : undefined}
+                  size="lg"
+                />
+              </div>
+              {avgRating > 0 && (
+                <div className="flex flex-col items-center">
+                  <p className="text-xs text-gray-400 mb-1">Média</p>
+                  <RatingStars value={avgRating} size="lg" count={ratingCount} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Comments ──────────────────────────────────────────────────── */}
+        {movie.id > 0 && (
+          <DisqusComments mediaId={movie.id} mediaType="movie" title={movie.title} />
+        )}
       </div>
     </div>
   );
