@@ -1,6 +1,6 @@
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE = 'https://image.tmdb.org/t/p/';
-const ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4MTdjMTg0MGQyOWNkZTFjNjI0NDhlYWVhNTYzMTk3ZCIsIm5iZiI6MTc4NDEzOTQ3Mi41ODQsInN1YiI6IjZhNTdjZWQwNDliMDNkMjllNWQ2MjFmZiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.idDdHydn8lcyn5ZBIrIsSz0i9hEN5kLl3U4adpeWPzA';
+const ACCESS_TOKEN = import.meta.env.VITE_TMDB_TOKEN;
 
 async function fetchTMDB<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(`${BASE_URL}${endpoint}`);

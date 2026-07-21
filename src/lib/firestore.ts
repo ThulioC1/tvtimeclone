@@ -69,9 +69,10 @@ export const createUserProfile = async (
     displayName: data.displayName || '',
     email: data.email || '',
     photoURL: data.photoURL || null,
+    coverURL: data.coverURL || null,
+    bannerShowId: data.bannerShowId ?? null,
     createdAt: serverTimestamp(),
     totalWatchMinutes: 0,
-    ...data,
   });
 };
 
@@ -86,7 +87,7 @@ export const updateUserProfile = async (
   data: Partial<UserProfile>
 ): Promise<void> => {
   const ref = doc(db, 'users', uid);
-  await updateDoc(ref, data as any);
+  await updateDoc(ref, data);
 };
 
 export const setBannerShow = async (uid: string, showId: number | string | null): Promise<void> => {
