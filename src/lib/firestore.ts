@@ -337,17 +337,26 @@ export const markAllEpisodesWatched = async (
   const userRef = doc(db, 'users', uid);
 
   await runTransaction(db, async (transaction) => {
+    const epEntries = episodes.map((ep) => ({
+      ep,
+      ref: doc(episodesRef, getEpisodeId(ep.seasonNumber, ep.episodeNumber)),
+    }));
+
+    const epSnaps = await Promise.all(
+      epEntries.map(({ ref }) => transaction.get(ref))
+    );
+
+    const showSnap = await transaction.get(showRef);
+    const userSnap = await transaction.get(userRef);
+
     let totalMinutes = 0;
     let newCount = 0;
 
-    for (const ep of episodes) {
-      const id = getEpisodeId(ep.seasonNumber, ep.episodeNumber);
-      const epRef = doc(episodesRef, id);
-      const epSnap = await transaction.get(epRef);
-      if (epSnap.exists()) continue;
-
+    for (let i = 0; i < epEntries.length; i++) {
+      if (epSnaps[i].exists()) continue;
+      const { ep, ref } = epEntries[i];
       const rt = typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : 30;
-      transaction.set(epRef, {
+      transaction.set(ref, {
         seasonNumber: ep.seasonNumber,
         episodeNumber: ep.episodeNumber,
         watchedAt: serverTimestamp(),
@@ -358,7 +367,6 @@ export const markAllEpisodesWatched = async (
     }
 
     if (newCount > 0) {
-      const showSnap = await transaction.get(showRef);
       if (showSnap.exists()) {
         const current = showSnap.data() as UserShow;
         transaction.update(showRef, {
@@ -366,7 +374,6 @@ export const markAllEpisodesWatched = async (
           lastWatchedAt: serverTimestamp(),
         });
       }
-      const userSnap = await transaction.get(userRef);
       if (userSnap.exists()) {
         const profile = userSnap.data() as UserProfile;
         transaction.update(userRef, {
@@ -420,18 +427,27 @@ export const markSeasonWatched = async (
   const userRef = doc(db, 'users', uid);
 
   await runTransaction(db, async (transaction) => {
+    const seasonEpisodes = episodes.filter((ep) => ep.seasonNumber === seasonNumber);
+    const epEntries = seasonEpisodes.map((ep) => ({
+      ep,
+      ref: doc(episodesRef, getEpisodeId(ep.seasonNumber, ep.episodeNumber)),
+    }));
+
+    const epSnaps = await Promise.all(
+      epEntries.map(({ ref }) => transaction.get(ref))
+    );
+
+    const showSnap = await transaction.get(showRef);
+    const userSnap = await transaction.get(userRef);
+
     let totalMinutes = 0;
     let newCount = 0;
 
-    for (const ep of episodes) {
-      if (ep.seasonNumber !== seasonNumber) continue;
-      const id = getEpisodeId(ep.seasonNumber, ep.episodeNumber);
-      const epRef = doc(episodesRef, id);
-      const epSnap = await transaction.get(epRef);
-      if (epSnap.exists()) continue;
-
+    for (let i = 0; i < epEntries.length; i++) {
+      if (epSnaps[i].exists()) continue;
+      const { ep, ref } = epEntries[i];
       const rt = typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : 30;
-      transaction.set(epRef, {
+      transaction.set(ref, {
         seasonNumber: ep.seasonNumber,
         episodeNumber: ep.episodeNumber,
         watchedAt: serverTimestamp(),
@@ -442,7 +458,6 @@ export const markSeasonWatched = async (
     }
 
     if (newCount > 0) {
-      const showSnap = await transaction.get(showRef);
       if (showSnap.exists()) {
         const current = showSnap.data() as UserShow;
         transaction.update(showRef, {
@@ -450,7 +465,6 @@ export const markSeasonWatched = async (
           lastWatchedAt: serverTimestamp(),
         });
       }
-      const userSnap = await transaction.get(userRef);
       if (userSnap.exists()) {
         const profile = userSnap.data() as UserProfile;
         transaction.update(userRef, {
