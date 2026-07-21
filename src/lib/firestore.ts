@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   onSnapshot,
   writeBatch,
+  runTransaction,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -225,6 +226,14 @@ export const markEpisodeWatched = async (
 ): Promise<void> => {
   const episodeId = getEpisodeId(seasonNumber, episodeNumber);
   const ref = doc(db, 'users', uid, 'userShows', String(showId), 'episodes', episodeId);
+
+  // Prevent double-counting: if the episode doc already exists, just bump timestamp.
+  const existingSnap = await getDoc(ref);
+  if (existingSnap.exists()) {
+    await updateDoc(ref, { watchedAt: serverTimestamp() });
+    return;
+  }
+
   const effectiveRuntime = typeof runtime === 'number' && runtime > 0 ? runtime : 30;
   await setDoc(ref, {
     seasonNumber,
@@ -233,7 +242,6 @@ export const markEpisodeWatched = async (
     runtime: effectiveRuntime,
   });
 
-  // Update watchedCount and totalWatchMinutes
   const showRef = doc(db, 'users', uid, 'userShows', String(showId));
   const showSnap = await getDoc(showRef);
   if (showSnap.exists()) {
@@ -244,7 +252,6 @@ export const markEpisodeWatched = async (
     });
   }
 
-  // Update user total watch minutes
   const userRef = doc(db, 'users', uid);
   const userSnap = await getDoc(userRef);
   if (userSnap.exists()) {
@@ -329,42 +336,45 @@ export const markAllEpisodesWatched = async (
   const showRef = doc(db, 'users', uid, 'userShows', String(showId));
   const userRef = doc(db, 'users', uid);
 
-  const existingSnap = await getDocs(episodesRef);
-  const existingIds = new Set(existingSnap.docs.map((d) => d.id));
+  await runTransaction(db, async (transaction) => {
+    let totalMinutes = 0;
+    let newCount = 0;
 
-  const batch = writeBatch(db);
-  let totalMinutes = 0;
-  let newCount = 0;
+    for (const ep of episodes) {
+      const id = getEpisodeId(ep.seasonNumber, ep.episodeNumber);
+      const epRef = doc(episodesRef, id);
+      const epSnap = await transaction.get(epRef);
+      if (epSnap.exists()) continue;
 
-  for (const ep of episodes) {
-    const id = getEpisodeId(ep.seasonNumber, ep.episodeNumber);
-    if (existingIds.has(id)) continue;
-    const rt = typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : 30;
-    batch.set(doc(episodesRef, id), {
-      seasonNumber: ep.seasonNumber,
-      episodeNumber: ep.episodeNumber,
-      watchedAt: serverTimestamp(),
-      runtime: rt,
-    });
-    totalMinutes += rt;
-    newCount += 1;
-  }
-
-  if (newCount > 0) {
-    const showSnap = await getDoc(showRef);
-    if (showSnap.exists()) {
-      const current = showSnap.data() as UserShow;
-      batch.update(showRef, { watchedCount: current.watchedCount + newCount });
-    }
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-      const profile = userSnap.data() as UserProfile;
-      batch.update(userRef, {
-        totalWatchMinutes: (profile.totalWatchMinutes || 0) + totalMinutes,
+      const rt = typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : 30;
+      transaction.set(epRef, {
+        seasonNumber: ep.seasonNumber,
+        episodeNumber: ep.episodeNumber,
+        watchedAt: serverTimestamp(),
+        runtime: rt,
       });
+      totalMinutes += rt;
+      newCount += 1;
     }
-    await batch.commit();
-  }
+
+    if (newCount > 0) {
+      const showSnap = await transaction.get(showRef);
+      if (showSnap.exists()) {
+        const current = showSnap.data() as UserShow;
+        transaction.update(showRef, {
+          watchedCount: current.watchedCount + newCount,
+          lastWatchedAt: serverTimestamp(),
+        });
+      }
+      const userSnap = await transaction.get(userRef);
+      if (userSnap.exists()) {
+        const profile = userSnap.data() as UserProfile;
+        transaction.update(userRef, {
+          totalWatchMinutes: (profile.totalWatchMinutes || 0) + totalMinutes,
+        });
+      }
+    }
+  });
 };
 
 export const unmarkAllEpisodesWatched = async (
@@ -409,46 +419,46 @@ export const markSeasonWatched = async (
   const showRef = doc(db, 'users', uid, 'userShows', String(showId));
   const userRef = doc(db, 'users', uid);
 
-  const existingSnap = await getDocs(episodesRef);
-  const existingIds = new Set(existingSnap.docs.map((d) => d.id));
+  await runTransaction(db, async (transaction) => {
+    let totalMinutes = 0;
+    let newCount = 0;
 
-  const batch = writeBatch(db);
-  let totalMinutes = 0;
-  let newCount = 0;
+    for (const ep of episodes) {
+      if (ep.seasonNumber !== seasonNumber) continue;
+      const id = getEpisodeId(ep.seasonNumber, ep.episodeNumber);
+      const epRef = doc(episodesRef, id);
+      const epSnap = await transaction.get(epRef);
+      if (epSnap.exists()) continue;
 
-  for (const ep of episodes) {
-    if (ep.seasonNumber !== seasonNumber) continue;
-    const id = getEpisodeId(ep.seasonNumber, ep.episodeNumber);
-    if (existingIds.has(id)) continue;
-    const rt = typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : 30;
-    batch.set(doc(episodesRef, id), {
-      seasonNumber: ep.seasonNumber,
-      episodeNumber: ep.episodeNumber,
-      watchedAt: serverTimestamp(),
-      runtime: rt,
-    });
-    totalMinutes += rt;
-    newCount += 1;
-  }
-
-  if (newCount > 0) {
-    const showSnap = await getDoc(showRef);
-    if (showSnap.exists()) {
-      const current = showSnap.data() as UserShow;
-      batch.update(showRef, {
-        watchedCount: current.watchedCount + newCount,
-        lastWatchedAt: serverTimestamp(),
+      const rt = typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : 30;
+      transaction.set(epRef, {
+        seasonNumber: ep.seasonNumber,
+        episodeNumber: ep.episodeNumber,
+        watchedAt: serverTimestamp(),
+        runtime: rt,
       });
+      totalMinutes += rt;
+      newCount += 1;
     }
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-      const profile = userSnap.data() as UserProfile;
-      batch.update(userRef, {
-        totalWatchMinutes: (profile.totalWatchMinutes || 0) + totalMinutes,
-      });
+
+    if (newCount > 0) {
+      const showSnap = await transaction.get(showRef);
+      if (showSnap.exists()) {
+        const current = showSnap.data() as UserShow;
+        transaction.update(showRef, {
+          watchedCount: current.watchedCount + newCount,
+          lastWatchedAt: serverTimestamp(),
+        });
+      }
+      const userSnap = await transaction.get(userRef);
+      if (userSnap.exists()) {
+        const profile = userSnap.data() as UserProfile;
+        transaction.update(userRef, {
+          totalWatchMinutes: (profile.totalWatchMinutes || 0) + totalMinutes,
+        });
+      }
     }
-    await batch.commit();
-  }
+  });
 };
 
 export const unmarkSeasonWatched = async (
