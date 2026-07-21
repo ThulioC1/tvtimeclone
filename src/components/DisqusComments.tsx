@@ -1,6 +1,7 @@
 import { DiscussionEmbed } from 'disqus-react';
 
 const SHORTNAME = 'timetowatch';
+const SITE_URL = 'https://timetowatch1.vercel.app';
 
 interface Props {
   mediaId: number;
@@ -9,7 +10,7 @@ interface Props {
 }
 
 const DisqusComments = ({ mediaId, mediaType, title }: Props) => {
-  const url = `${window.location.origin}/${mediaType === 'movie' ? 'movie' : 'show'}/${mediaId}`;
+  const url = `${SITE_URL}/${mediaType === 'movie' ? 'movie' : 'show'}/${mediaId}`;
   const identifier = `${mediaType}-${mediaId}`;
 
   return (
