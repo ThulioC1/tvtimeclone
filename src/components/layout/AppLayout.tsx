@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import FriendSearchModal from '../FriendSearchModal';
 
 // Icons (inline SVG components for zero-dependency)
 const HomeIcon = ({ filled }: { filled?: boolean }) => (
@@ -55,7 +54,6 @@ const navItems = [
 
 const AppLayout: React.FC = () => {
   const { user, userProfile } = useAuth();
-  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
     <div className="flex h-screen bg-dark-900 overflow-hidden">
@@ -94,18 +92,7 @@ const AppLayout: React.FC = () => {
             </NavLink>
           ))}
 
-          {/* Buscar pessoas */}
-          <button
-            onClick={() => setSearchOpen(true)}
-            className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/[0.03] w-full text-left"
-          >
-            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            Pessoas
-          </button>
-
-          {/* Seguindo */}
+          {/* Comunidade */}
           <NavLink
             to="/following"
             className={({ isActive }) =>
@@ -122,23 +109,14 @@ const AppLayout: React.FC = () => {
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-brand-400" />
                 )}
                 <UsersIcon filled={isActive} />
-                Seguindo
+                Comunidade
               </>
             )}
           </NavLink>
         </nav>
 
         {/* User info */}
-        <div className="px-4 py-4 border-t border-dark-500 space-y-2">
-          <button
-            onClick={() => setSearchOpen(true)}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/[0.03] transition-all duration-200"
-          >
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            Buscar pessoas
-          </button>
+        <div className="px-4 py-4 border-t border-dark-500">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-brand-600 flex items-center justify-center overflow-hidden shrink-0">
               {user?.photoURL ? (
@@ -187,15 +165,6 @@ const AppLayout: React.FC = () => {
                 )}
               </NavLink>
             ))}
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="nav-item flex-1 py-2.5 text-gray-500 hover:text-white transition-colors duration-200"
-            >
-              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <span className="text-[10px] font-medium mt-0.5">Pessoas</span>
-            </button>
             <NavLink
               to="/following"
               className={({ isActive }) =>
@@ -207,15 +176,13 @@ const AppLayout: React.FC = () => {
               {({ isActive }) => (
                 <>
                   <UsersIcon filled={isActive} />
-                  <span className="text-[10px] font-medium mt-0.5">Seguindo</span>
+                  <span className="text-[10px] font-medium mt-0.5">Comunidade</span>
                 </>
               )}
             </NavLink>
           </div>
         </nav>
       </main>
-
-      <FriendSearchModal open={searchOpen} currentUid={user?.uid || ''} onClose={() => setSearchOpen(false)} />
     </div>
   );
 };
