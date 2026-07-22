@@ -7,7 +7,11 @@ import {
   collection,
   getDocs,
   query,
+  where,
   orderBy,
+  startAt,
+  endAt,
+  limit,
   serverTimestamp,
   onSnapshot,
   writeBatch,
@@ -670,3 +674,186 @@ export const subscribeToWatchedEpisodeDocs = (
     }
   );
 };
+
+// ── Friends ────────────────────────────────────────────────────────────────────
+
+export interface FriendRequest {
+  id: string;
+  from: string;
+  to: string;
+  fromName: string;
+  fromPhotoURL: string | null;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: Date;
+}
+
+export interface FriendInfo {
+  friendId: string;
+  displayName: string;
+  photoURL: string | null;
+  becameFriendsAt: Date;
+}
+
+export const searchUsers = async (
+  term: string
+): Promise<Pick<UserProfile, 'uid' | 'displayName' | 'photoURL'>[]> => {
+  if (!term.trim()) return [];
+  const ref = collection(db, 'users');
+  const q = query(
+    ref,
+    orderBy('displayName'),
+    startAt(term),
+    endAt(term + '\uf8ff'),
+    limit(20)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data() as UserProfile;
+    return { uid: d.id, displayName: data.displayName, photoURL: data.photoURL };
+  });
+};
+
+export const sendFriendRequest = async (
+  from: string,
+  to: string,
+  fromName: string,
+  fromPhotoURL: string | null
+): Promise<void> => {
+  const ref = doc(collection(db, 'friendRequests'));
+  await setDoc(ref, {
+    from,
+    to,
+    fromName,
+    fromPhotoURL,
+    status: 'pending',
+    createdAt: serverTimestamp(),
+  });
+};
+
+export const acceptFriendRequest = async (
+  requestId: string,
+  from: string,
+  to: string
+): Promise<void> => {
+  await runTransaction(db, async (transaction) => {
+    const reqRef = doc(db, 'friendRequests', requestId);
+    const reqSnap = await transaction.get(reqRef);
+    if (!reqSnap.exists() || reqSnap.data().status !== 'pending') return;
+
+    transaction.update(reqRef, { status: 'accepted' });
+
+    const toFriendRef = doc(db, 'users', to, 'friends', from);
+    transaction.set(toFriendRef, {
+      friendId: from,
+      displayName: reqSnap.data().fromName,
+      photoURL: reqSnap.data().fromPhotoURL,
+      becameFriendsAt: serverTimestamp(),
+    });
+
+    const toUserSnap = await transaction.get(doc(db, 'users', to));
+
+    const toName = (toUserSnap.data() as UserProfile)?.displayName || '';
+    const toPhoto = (toUserSnap.data() as UserProfile)?.photoURL || null;
+
+    const fromFriendRef = doc(db, 'users', from, 'friends', to);
+    transaction.set(fromFriendRef, {
+      friendId: to,
+      displayName: toName,
+      photoURL: toPhoto,
+      becameFriendsAt: serverTimestamp(),
+    });
+  });
+};
+
+export const declineFriendRequest = async (requestId: string): Promise<void> => {
+  await updateDoc(doc(db, 'friendRequests', requestId), { status: 'rejected' });
+};
+
+export const getFriendRequests = async (uid: string): Promise<FriendRequest[]> => {
+  const q = query(
+    collection(db, 'friendRequests'),
+    where('to', '==', uid),
+    where('status', '==', 'pending'),
+    orderBy('createdAt', 'desc')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FriendRequest));
+};
+
+export const getSentFriendRequests = async (uid: string): Promise<FriendRequest[]> => {
+  const q = query(
+    collection(db, 'friendRequests'),
+    where('from', '==', uid),
+    where('status', '==', 'pending'),
+    orderBy('createdAt', 'desc')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FriendRequest));
+};
+
+export const subscribeToFriendRequests = (
+  uid: string,
+  callback: (requests: FriendRequest[]) => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, 'friendRequests'),
+    where('to', '==', uid),
+    where('status', '==', 'pending'),
+    orderBy('createdAt', 'desc')
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() } as FriendRequest)));
+  });
+};
+
+export const subscribeToFriends = (
+  uid: string,
+  callback: (friends: FriendInfo[]) => void
+): Unsubscribe => {
+  const ref = collection(db, 'users', uid, 'friends');
+  return onSnapshot(ref, (snap) => {
+    callback(snap.docs.map((d) => d.data() as FriendInfo));
+  });
+};
+
+export const getFriends = async (uid: string): Promise<FriendInfo[]> => {
+  const snap = await getDocs(collection(db, 'users', uid, 'friends'));
+  return snap.docs.map((d) => d.data() as FriendInfo);
+};
+
+export const areFriends = async (uid1: string, uid2: string): Promise<boolean> => {
+  const snap = await getDoc(doc(db, 'users', uid1, 'friends', uid2));
+  return snap.exists();
+};
+
+export const checkFriendship = async (
+  currentUid: string,
+  targetUid: string
+): Promise<'self' | 'friend' | 'pending' | 'sent' | 'none'> => {
+  if (currentUid === targetUid) return 'self';
+
+  const friendSnap = await getDoc(doc(db, 'users', currentUid, 'friends', targetUid));
+  if (friendSnap.exists()) return 'friend';
+
+  const sentQ = query(
+    collection(db, 'friendRequests'),
+    where('from', '==', currentUid),
+    where('to', '==', targetUid),
+    where('status', '==', 'pending')
+  );
+  const sentSnap = await getDocs(sentQ);
+  if (!sentSnap.empty) return 'sent';
+
+  const receivedQ = query(
+    collection(db, 'friendRequests'),
+    where('from', '==', targetUid),
+    where('to', '==', currentUid),
+    where('status', '==', 'pending')
+  );
+  const receivedSnap = await getDocs(receivedQ);
+  if (!receivedSnap.empty) return 'pending';
+
+  return 'none';
+};
+
+

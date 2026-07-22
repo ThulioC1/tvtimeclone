@@ -754,6 +754,22 @@ const ShowDetailPage: React.FC = () => {
         >
           <BackIcon />
         </button>
+        <button
+          onClick={() => {
+            const url = window.location.href;
+            const text = `Veja "${show?.name || ''}" no Time to Watch!`;
+            if (navigator.share) {
+              navigator.share({ title: text, url });
+            } else {
+              navigator.clipboard.writeText(url).then(() => alert('Link copiado!'));
+            }
+          }}
+          className="absolute top-4 right-4 bg-dark-900/60 backdrop-blur-md p-2.5 rounded-xl text-white hover:bg-dark-800 transition-colors border border-white/10"
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+        </button>
       </div>
 
       <div className="px-4 md:px-6 pb-28 md:pb-10 -mt-20 relative">

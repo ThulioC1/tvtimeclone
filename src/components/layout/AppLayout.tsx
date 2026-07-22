@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { subscribeToFriendRequests, type FriendRequest } from '../../lib/firestore';
+import FriendSearchModal from '../FriendSearchModal';
+import FriendRequestsModal from '../FriendRequestsModal';
 
 // Icons (inline SVG components for zero-dependency)
 const HomeIcon = ({ filled }: { filled?: boolean }) => (
@@ -21,6 +24,11 @@ const ListIcon = ({ filled }: { filled?: boolean }) => (
 const UserIcon = ({ filled }: { filled?: boolean }) => (
   <svg viewBox="0 0 24 24" className="w-6 h-6" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+const FriendsIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
   </svg>
 );
 
@@ -49,6 +57,15 @@ const navItems = [
 
 const AppLayout: React.FC = () => {
   const { user, userProfile } = useAuth();
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [requestsOpen, setRequestsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeToFriendRequests(user.uid, setFriendRequests);
+    return unsub;
+  }, [user]);
 
   return (
     <div className="flex h-screen bg-dark-900 overflow-hidden">
@@ -86,10 +103,33 @@ const AppLayout: React.FC = () => {
               )}
             </NavLink>
           ))}
+
+          {/* Friends button */}
+          <button
+            onClick={() => setRequestsOpen(true)}
+            className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/[0.03] w-full text-left"
+          >
+            <FriendsIcon />
+            Amigos
+            {friendRequests.length > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                {friendRequests.length}
+              </span>
+            )}
+          </button>
         </nav>
 
         {/* User info */}
-        <div className="px-4 py-4 border-t border-dark-500">
+        <div className="px-4 py-4 border-t border-dark-500 space-y-2">
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/[0.03] transition-all duration-200"
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Buscar pessoas
+          </button>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-brand-600 flex items-center justify-center overflow-hidden shrink-0">
               {user?.photoURL ? (
@@ -138,9 +178,24 @@ const AppLayout: React.FC = () => {
                 )}
               </NavLink>
             ))}
+            <button
+              onClick={() => setRequestsOpen(true)}
+              className="nav-item flex-1 py-2.5 relative text-gray-500 hover:text-white transition-colors duration-200"
+            >
+              <FriendsIcon />
+              <span className="text-[10px] font-medium mt-0.5">Amigos</span>
+              {friendRequests.length > 0 && (
+                <span className="absolute top-0.5 right-1 bg-red-500 text-white text-[8px] font-bold px-1 rounded-full min-w-[14px] text-center">
+                  {friendRequests.length}
+                </span>
+              )}
+            </button>
           </div>
         </nav>
       </main>
+
+      <FriendSearchModal open={searchOpen} currentUid={user?.uid || ''} onClose={() => setSearchOpen(false)} />
+      <FriendRequestsModal open={requestsOpen} uid={user?.uid || ''} onClose={() => setRequestsOpen(false)} />
     </div>
   );
 };
