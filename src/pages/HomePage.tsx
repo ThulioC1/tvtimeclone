@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { subscribeToUserShows, setBannerShow, getBannerUrl, type UserShow } from '../lib/firestore';
+import { subscribeToUserShows, setBannerShow, getBannerUrl, subscribeToFollowing, type UserShow, type FollowingInfo } from '../lib/firestore';
 import { getBackdropUrl } from '../lib/tmdb';
 import { formatWatchTimeShort } from '../lib/format';
 import BannerPickerModal from '../components/BannerPickerModal';
@@ -151,6 +151,7 @@ const StatCard = ({ value, label }: { value: number | string; label: string }) =
 const HomePage: React.FC = () => {
   const { user, userProfile } = useAuth();
   const [userShows, setUserShows] = useState<UserShow[]>([]);
+  const [following, setFollowing] = useState<FollowingInfo[]>([]);
 
   const { data: recommendedData, isLoading: trendingLoading } = useQuery({
     queryKey: ['recommended'],
@@ -171,6 +172,12 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeToUserShows(user.uid, setUserShows);
+    return unsub;
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeToFollowing(user.uid, setFollowing);
     return unsub;
   }, [user]);
 
@@ -293,6 +300,35 @@ const HomePage: React.FC = () => {
                   )}
                 </div>
                 <p className="text-xs font-medium text-white truncate p-2">{show.title}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Following */}
+      {following.length > 0 && (
+        <section className="mb-8">
+          <h2 className="section-title mb-4">Seguindo</h2>
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+            {following.map((f) => (
+              <Link
+                key={f.targetId}
+                to={`/user/${f.targetId}`}
+                className="card-hover flex flex-col items-center gap-1.5 p-3 min-w-20 shrink-0 rounded-xl"
+              >
+                <div className="w-12 h-12 rounded-full bg-brand-500 flex items-center justify-center overflow-hidden">
+                  {f.photoURL ? (
+                    <img src={f.photoURL} alt={f.displayName} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-white font-bold text-lg">
+                      {(f.displayName || 'U')[0].toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs text-gray-300 truncate max-w-16 text-center">
+                  {f.displayName?.split(' ')[0] || 'Usuário'}
+                </span>
               </Link>
             ))}
           </div>

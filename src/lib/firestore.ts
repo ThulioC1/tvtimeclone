@@ -855,4 +855,60 @@ export const checkFriendship = async (
   return 'none';
 };
 
+// ── Follow ─────────────────────────────────────────────────────────────────────
+
+export const followUser = async (
+  followerUid: string,
+  targetUid: string,
+  targetName: string,
+  targetPhotoURL: string | null
+): Promise<void> => {
+  const ref = doc(db, 'users', followerUid, 'following', targetUid);
+  await setDoc(ref, {
+    targetId: targetUid,
+    displayName: targetName,
+    photoURL: targetPhotoURL,
+    followedAt: serverTimestamp(),
+  });
+};
+
+export const unfollowUser = async (
+  followerUid: string,
+  targetUid: string
+): Promise<void> => {
+  await deleteDoc(doc(db, 'users', followerUid, 'following', targetUid));
+};
+
+export const isFollowing = async (
+  followerUid: string,
+  targetUid: string
+): Promise<boolean> => {
+  const snap = await getDoc(doc(db, 'users', followerUid, 'following', targetUid));
+  return snap.exists();
+};
+
+export interface FollowingInfo {
+  targetId: string;
+  displayName: string;
+  photoURL: string | null;
+  followedAt: Date;
+}
+
+export const subscribeToFollowing = (
+  uid: string,
+  callback: (list: FollowingInfo[]) => void
+): Unsubscribe => {
+  const ref = collection(db, 'users', uid, 'following');
+  const q = query(ref, orderBy('followedAt', 'desc'));
+  return onSnapshot(
+    q,
+    (snap) => {
+      callback(snap.docs.map((d) => d.data() as FollowingInfo));
+    },
+    (err) => {
+      console.warn('Erro ao escutar lista de seguindo:', err);
+    }
+  );
+};
+
 

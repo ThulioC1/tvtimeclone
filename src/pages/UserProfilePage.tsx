@@ -5,6 +5,9 @@ import {
   getUserProfile,
   getUserShows,
   getBannerUrl,
+  followUser,
+  unfollowUser,
+  isFollowing,
   type UserProfile,
   type UserShow,
 } from '../lib/firestore';
@@ -17,6 +20,8 @@ const UserProfilePage: React.FC = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [shows, setShows] = useState<UserShow[]>([]);
+  const [following, setFollowing] = useState(false);
+  const [togglingFollow, setTogglingFollow] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,12 +29,17 @@ const UserProfilePage: React.FC = () => {
     setLoading(true);
 
     const load = async () => {
-      const [prof, userShows] = await Promise.all([
+      const [prof, follow] = await Promise.all([
         getUserProfile(uid).catch(() => null),
-        getUserShows(uid).catch(() => [] as UserShow[]),
+        isFollowing(user.uid, uid),
       ]);
       setProfile(prof);
-      setShows(userShows);
+      setFollowing(follow);
+
+      if (follow || user.uid === uid) {
+        const userShows = await getUserShows(uid).catch(() => []);
+        setShows(userShows);
+      }
       setLoading(false);
     };
 
@@ -41,6 +51,25 @@ const UserProfilePage: React.FC = () => {
 
   const bannerRaw = getBannerUrl(shows, profile?.bannerShowId ?? null);
   const bannerUrl = bannerRaw ? getBackdropUrl(bannerRaw) : null;
+
+  const handleFollow = async () => {
+    if (!user || !profile) return;
+    setTogglingFollow(true);
+    try {
+      if (following) {
+        await unfollowUser(user.uid, uid);
+        setFollowing(false);
+        setShows([]);
+      } else {
+        await followUser(user.uid, uid, profile.displayName || 'Usuário', profile.photoURL);
+        setFollowing(true);
+        const userShows = await getUserShows(uid).catch(() => []);
+        setShows(userShows);
+      }
+    } finally {
+      setTogglingFollow(false);
+    }
+  };
 
   if (loading || !profile) {
     return (
@@ -73,93 +102,118 @@ const UserProfilePage: React.FC = () => {
               )}
             </div>
           </div>
-          <div className="mt-3 md:mt-4">
-            <h2 className="text-xl md:text-2xl font-extrabold text-white">
-              {profile.displayName || 'Usuário'}
-              {isSelf && <span className="ml-2 text-sm text-brand-400 font-normal">(você)</span>}
-            </h2>
-            <p className="text-sm text-gray-400 mt-1">{profile.email}</p>
+          <div className="mt-3 md:mt-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl md:text-2xl font-extrabold text-white">
+                {profile.displayName || 'Usuário'}
+                {isSelf && <span className="ml-2 text-sm text-brand-400 font-normal">(você)</span>}
+              </h2>
+              <p className="text-sm text-gray-400 mt-1">{profile.email}</p>
+            </div>
+            {!isSelf && (
+              <button
+                onClick={handleFollow}
+                disabled={togglingFollow}
+                className={`py-2 px-4 text-sm font-medium rounded-xl transition-colors disabled:opacity-50 ${
+                  following
+                    ? 'bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400'
+                    : 'bg-brand-600 text-white hover:bg-brand-500'
+                }`}
+              >
+                {togglingFollow ? '...' : following ? 'Seguindo' : 'Seguir'}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       <div className="px-4 md:px-6 mt-6">
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
-          <div className="card p-4 sm:p-5 rounded-2xl">
-            <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{shows.filter((s) => s.mediaType !== 'movie').length}</div>
-            <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Séries na lista</div>
+        {!following && !isSelf ? (
+          <div className="card p-8 text-center">
+            <p className="text-gray-400 text-sm">
+              Siga {profile.displayName?.split(' ')[0] || 'este usuário'} para ver as séries que está assistindo e suas favoritas.
+            </p>
           </div>
-          <div className="card p-4 sm:p-5 rounded-2xl">
-            <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{shows.reduce((s, sh) => s + sh.watchedCount, 0)}</div>
-            <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Episódios assistidos</div>
-          </div>
-          <div className="card p-4 sm:p-5 rounded-2xl">
-            <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{formatWatchTime(profile.totalWatchMinutes || 0)}</div>
-            <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Tempo assistido</div>
-          </div>
-          <div className="card p-4 sm:p-5 rounded-2xl">
-            <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{shows.filter((s) => s.mediaType !== 'movie' && s.status === 'completed').length}</div>
-            <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Séries concluídas</div>
-          </div>
-        </div>
+        ) : (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+              <div className="card p-4 sm:p-5 rounded-2xl">
+                <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{shows.filter((s) => s.mediaType !== 'movie').length}</div>
+                <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Séries na lista</div>
+              </div>
+              <div className="card p-4 sm:p-5 rounded-2xl">
+                <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{shows.reduce((s, sh) => s + sh.watchedCount, 0)}</div>
+                <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Episódios assistidos</div>
+              </div>
+              <div className="card p-4 sm:p-5 rounded-2xl">
+                <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{formatWatchTime(profile.totalWatchMinutes || 0)}</div>
+                <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Tempo assistido</div>
+              </div>
+              <div className="card p-4 sm:p-5 rounded-2xl">
+                <div className="text-2xl sm:text-3xl font-bold gradient-text leading-none">{shows.filter((s) => s.mediaType !== 'movie' && s.status === 'completed').length}</div>
+                <div className="text-xs sm:text-sm text-gray-400 mt-2 leading-tight">Séries concluídas</div>
+              </div>
+            </div>
 
-        {/* Watching */}
-        {watching.length > 0 && (
-          <section className="mb-8">
-            <h2 className="section-title mb-4">Assistindo</h2>
-            <div className="space-y-2">
-              {watching.slice(0, 5).map((s) => {
-                const posterUrl = getPosterUrl(s.posterPath);
-                const progress = s.totalEpisodes > 0 ? (s.watchedCount / s.totalEpisodes) * 100 : 0;
-                return (
-                  <Link key={s.showId} to={`/show/${s.showId}`} className="card-hover flex items-center gap-3 p-3">
-                    <div className="w-10 h-14 rounded-lg overflow-hidden bg-dark-500 shrink-0">
-                      {posterUrl ? (
-                        <img src={posterUrl} alt={s.title} loading="lazy" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-dark-500" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{s.title}</p>
-                      <p className="text-xs text-gray-400 truncate">{s.watchedCount}/{s.totalEpisodes} eps</p>
-                    </div>
-                    <div className="w-16 shrink-0">
-                      <div className="progress-bar">
-                        <div className="progress-fill" style={{ width: `${progress}%` }} />
+            {/* Watching */}
+            {watching.length > 0 && (
+              <section className="mb-8">
+                <h2 className="section-title mb-4">Assistindo</h2>
+                <div className="space-y-2">
+                  {watching.slice(0, 5).map((s) => {
+                    const posterUrl = getPosterUrl(s.posterPath);
+                    const progress = s.totalEpisodes > 0 ? (s.watchedCount / s.totalEpisodes) * 100 : 0;
+                    return (
+                      <Link key={s.showId} to={`/show/${s.showId}`} className="card-hover flex items-center gap-3 p-3">
+                        <div className="w-10 h-14 rounded-lg overflow-hidden bg-dark-500 shrink-0">
+                          {posterUrl ? (
+                            <img src={posterUrl} alt={s.title} loading="lazy" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-dark-500" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{s.title}</p>
+                          <p className="text-xs text-gray-400 truncate">{s.watchedCount}/{s.totalEpisodes} eps</p>
+                        </div>
+                        <div className="w-16 shrink-0">
+                          <div className="progress-bar">
+                            <div className="progress-fill" style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* Favorites */}
+            {favorites.length > 0 && (
+              <section className="mb-8">
+                <h2 className="section-title mb-4">Favoritas</h2>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {favorites.map((s) => (
+                    <Link key={s.showId} to={`/show/${s.showId}`} className="card-hover group block">
+                      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-dark-600">
+                        {getPosterUrl(s.posterPath) ? (
+                          <img src={getPosterUrl(s.posterPath)!} alt={s.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        ) : (
+                          <div className="w-full h-full bg-dark-500" />
+                        )}
                       </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
+                      <p className="text-xs font-medium text-white truncate p-2">{s.title}</p>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
 
-        {/* Favorites */}
-        {favorites.length > 0 && (
-          <section className="mb-8">
-            <h2 className="section-title mb-4">Favoritas</h2>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-              {favorites.map((s) => (
-                <Link key={s.showId} to={`/show/${s.showId}`} className="card-hover group block">
-                  <div className="aspect-[2/3] rounded-xl overflow-hidden bg-dark-600">
-                    {getPosterUrl(s.posterPath) ? (
-                      <img src={getPosterUrl(s.posterPath)!} alt={s.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    ) : (
-                      <div className="w-full h-full bg-dark-500" />
-                    )}
-                  </div>
-                  <p className="text-xs font-medium text-white truncate p-2">{s.title}</p>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {watching.length === 0 && favorites.length === 0 && (
-          <p className="text-gray-400 text-sm text-center py-8">Nenhuma série para exibir.</p>
+            {watching.length === 0 && favorites.length === 0 && (
+              <p className="text-gray-400 text-sm text-center py-8">Nenhuma série para exibir.</p>
+            )}
+          </>
         )}
       </div>
     </div>
