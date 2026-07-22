@@ -792,13 +792,19 @@ export const subscribeToFriendRequests = (
   callback: (requests: FriendRequest[]) => void
 ): Unsubscribe => {
   const q = query(collection(db, 'friendRequests'), where('to', '==', uid));
-  return onSnapshot(q, (snap) => {
-    callback(
-      snap.docs
-        .map((d) => ({ id: d.id, ...d.data() } as FriendRequest))
-        .filter((r) => r.status === 'pending')
-    );
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      callback(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as FriendRequest))
+          .filter((r) => r.status === 'pending')
+      );
+    },
+    (err) => {
+      console.warn('Erro ao escutar pedidos de amizade:', err);
+    }
+  );
 };
 
 export const subscribeToFriends = (

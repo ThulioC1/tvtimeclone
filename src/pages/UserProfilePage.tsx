@@ -26,16 +26,23 @@ const UserProfilePage: React.FC = () => {
   useEffect(() => {
     if (!uid || !user) return;
     setLoading(true);
-    Promise.all([
-      getUserProfile(uid),
-      getUserShows(uid),
-      checkFriendship(user.uid, uid),
-    ]).then(([prof, userShows, rel]) => {
+
+    const load = async () => {
+      const [prof, rel] = await Promise.all([
+        getUserProfile(uid).catch(() => null),
+        checkFriendship(user.uid, uid),
+      ]);
       setProfile(prof);
-      setShows(userShows);
       setRelationship(rel);
+
+      if (prof && (rel === 'friend' || rel === 'self')) {
+        const userShows = await getUserShows(uid).catch(() => []);
+        setShows(userShows);
+      }
       setLoading(false);
-    });
+    };
+
+    load().catch(() => setLoading(false));
   }, [uid, user]);
 
   const watching = shows.filter((s) => s.status === 'watching');
