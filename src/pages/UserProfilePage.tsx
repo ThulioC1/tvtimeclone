@@ -5,8 +5,6 @@ import {
   getUserProfile,
   getUserShows,
   getBannerUrl,
-  checkFriendship,
-  sendFriendRequest,
   type UserProfile,
   type UserShow,
 } from '../lib/firestore';
@@ -19,26 +17,19 @@ const UserProfilePage: React.FC = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [shows, setShows] = useState<UserShow[]>([]);
-  const [relationship, setRelationship] = useState<'self' | 'friend' | 'pending' | 'sent' | 'none'>('none');
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!uid || !user) return;
     setLoading(true);
 
     const load = async () => {
-      const [prof, rel] = await Promise.all([
+      const [prof, userShows] = await Promise.all([
         getUserProfile(uid).catch(() => null),
-        checkFriendship(user.uid, uid),
+        getUserShows(uid).catch(() => [] as UserShow[]),
       ]);
       setProfile(prof);
-      setRelationship(rel);
-
-      if (prof && (rel === 'friend' || rel === 'self')) {
-        const userShows = await getUserShows(uid).catch(() => []);
-        setShows(userShows);
-      }
+      setShows(userShows);
       setLoading(false);
     };
 
@@ -60,6 +51,7 @@ const UserProfilePage: React.FC = () => {
   }
 
   const avatarLetter = (profile.displayName || 'U')[0].toUpperCase();
+  const isSelf = user?.uid === uid;
 
   return (
     <div className="max-w-2xl mx-auto pb-28 md:pb-0">
@@ -81,40 +73,12 @@ const UserProfilePage: React.FC = () => {
               )}
             </div>
           </div>
-          <div className="mt-3 md:mt-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-xl md:text-2xl font-extrabold text-white">
-                {profile.displayName || 'Usuário'}
-              </h2>
-              <p className="text-sm text-gray-400 mt-1">{profile.email}</p>
-            </div>
-            {relationship === 'none' && (
-              <button
-                onClick={async () => {
-                  if (!user) return;
-                  setSending(true);
-                  try {
-                    await sendFriendRequest(user.uid, uid, profile.displayName || 'Usuário', profile.photoURL);
-                    setRelationship('sent');
-                  } finally {
-                    setSending(false);
-                  }
-                }}
-                disabled={sending}
-                className="btn-primary py-2 px-4 text-sm disabled:opacity-50"
-              >
-                {sending ? '...' : 'Adicionar amigo'}
-              </button>
-            )}
-            {relationship === 'sent' && (
-              <span className="text-sm text-yellow-400 font-medium">Convite enviado</span>
-            )}
-            {relationship === 'pending' && (
-              <span className="text-sm text-yellow-400 font-medium">Pendente de sua resposta</span>
-            )}
-            {relationship === 'friend' && (
-              <span className="text-sm text-green-400 font-medium">Amigos</span>
-            )}
+          <div className="mt-3 md:mt-4">
+            <h2 className="text-xl md:text-2xl font-extrabold text-white">
+              {profile.displayName || 'Usuário'}
+              {isSelf && <span className="ml-2 text-sm text-brand-400 font-normal">(você)</span>}
+            </h2>
+            <p className="text-sm text-gray-400 mt-1">{profile.email}</p>
           </div>
         </div>
       </div>

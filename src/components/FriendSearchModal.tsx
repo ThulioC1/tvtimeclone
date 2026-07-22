@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { searchUsers, sendFriendRequest, type UserProfile } from '../lib/firestore';
+import { Link } from 'react-router-dom';
+import { searchUsers, type UserProfile } from '../lib/firestore';
 
 interface Props {
   open: boolean;
@@ -10,7 +11,6 @@ interface Props {
 const FriendSearchModal: React.FC<Props> = ({ open, currentUid, onClose }) => {
   const [term, setTerm] = useState('');
   const [results, setResults] = useState<Pick<UserProfile, 'uid' | 'displayName' | 'photoURL'>[]>([]);
-  const [sent, setSent] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -18,7 +18,6 @@ const FriendSearchModal: React.FC<Props> = ({ open, currentUid, onClose }) => {
     if (!open) return;
     setTerm('');
     setResults([]);
-    setSent(new Set());
     setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
 
@@ -32,13 +31,6 @@ const FriendSearchModal: React.FC<Props> = ({ open, currentUid, onClose }) => {
     }, 300);
     return () => clearTimeout(id);
   }, [term, currentUid]);
-
-  const handleSend = async (toUid: string) => {
-    if (sent.has(toUid)) return;
-    const profile = await import('../lib/firestore').then((m) => m.getUserProfile(currentUid));
-    await sendFriendRequest(currentUid, toUid, profile?.displayName || 'Usuário', profile?.photoURL || null);
-    setSent((prev) => new Set(prev).add(toUid));
-  };
 
   if (!open) return null;
 
@@ -67,7 +59,12 @@ const FriendSearchModal: React.FC<Props> = ({ open, currentUid, onClose }) => {
 
         <div className="space-y-2">
           {results.map((u) => (
-            <div key={u.uid} className="card-hover flex items-center gap-3 p-3 rounded-xl">
+            <Link
+              key={u.uid}
+              to={`/user/${u.uid}`}
+              onClick={onClose}
+              className="card-hover flex items-center gap-3 p-3 rounded-xl"
+            >
               <div className="w-10 h-10 rounded-full bg-brand-600 flex items-center justify-center overflow-hidden shrink-0">
                 {u.photoURL ? (
                   <img src={u.photoURL} alt="" className="w-full h-full object-cover" />
@@ -76,14 +73,8 @@ const FriendSearchModal: React.FC<Props> = ({ open, currentUid, onClose }) => {
                 )}
               </div>
               <p className="flex-1 text-sm font-medium text-white truncate">{u.displayName}</p>
-              {sent.has(u.uid) ? (
-                <span className="text-xs text-green-400">Convidado</span>
-              ) : (
-                <button onClick={() => handleSend(u.uid)} className="btn-primary py-1.5 px-3 text-xs">
-                  Adicionar
-                </button>
-              )}
-            </div>
+              <span className="text-xs text-brand-400">Ver perfil →</span>
+            </Link>
           ))}
         </div>
       </div>
