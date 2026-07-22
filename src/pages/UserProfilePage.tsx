@@ -108,7 +108,6 @@ const UserProfilePage: React.FC = () => {
                 {profile.displayName || 'Usuário'}
                 {isSelf && <span className="ml-2 text-sm text-brand-400 font-normal">(você)</span>}
               </h2>
-              <p className="text-sm text-gray-400 mt-1">{profile.email}</p>
             </div>
             {!isSelf && (
               <button

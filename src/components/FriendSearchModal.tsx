@@ -63,7 +63,7 @@ const FriendSearchModal: React.FC<Props> = ({ open, currentUid, onClose }) => {
               key={u.uid}
               to={`/user/${u.uid}`}
               onClick={onClose}
-              className="card-hover flex items-center gap-3 p-3 rounded-xl"
+              className="flex items-center gap-3 p-3 rounded-xl bg-dark-700/90 hover:bg-dark-600/90 hover:border-brand-500/30 border border-white/[0.06] transition-all duration-200"
             >
               <div className="w-10 h-10 rounded-full bg-brand-600 flex items-center justify-center overflow-hidden shrink-0">
                 {u.photoURL ? (

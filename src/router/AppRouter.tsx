@@ -11,6 +11,7 @@ const MovieDetailPage = React.lazy(() => import('../pages/MovieDetailPage'));
 const WatchlistPage = React.lazy(() => import('../pages/WatchlistPage'));
 const ProfilePage = React.lazy(() => import('../pages/ProfilePage'));
 const UserProfilePage = React.lazy(() => import('../pages/UserProfilePage'));
+const FollowingPage = React.lazy(() => import('../pages/FollowingPage'));
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -51,6 +52,7 @@ export const AppRouter = () => {
           <Route path="watchlist" element={<WatchlistPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="user/:uid" element={<UserProfilePage />} />
+          <Route path="following" element={<FollowingPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
