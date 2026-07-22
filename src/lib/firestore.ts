@@ -769,40 +769,35 @@ export const declineFriendRequest = async (requestId: string): Promise<void> => 
   await updateDoc(doc(db, 'friendRequests', requestId), { status: 'rejected' });
 };
 
+// ── Friend queries (single-field where only — no composite indexes needed) ─────
+
 export const getFriendRequests = async (uid: string): Promise<FriendRequest[]> => {
-  const q = query(
-    collection(db, 'friendRequests'),
-    where('to', '==', uid),
-    where('status', '==', 'pending'),
-    orderBy('createdAt', 'desc')
-  );
+  const q = query(collection(db, 'friendRequests'), where('to', '==', uid));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FriendRequest));
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() } as FriendRequest))
+    .filter((r) => r.status === 'pending');
 };
 
 export const getSentFriendRequests = async (uid: string): Promise<FriendRequest[]> => {
-  const q = query(
-    collection(db, 'friendRequests'),
-    where('from', '==', uid),
-    where('status', '==', 'pending'),
-    orderBy('createdAt', 'desc')
-  );
+  const q = query(collection(db, 'friendRequests'), where('from', '==', uid));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FriendRequest));
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() } as FriendRequest))
+    .filter((r) => r.status === 'pending');
 };
 
 export const subscribeToFriendRequests = (
   uid: string,
   callback: (requests: FriendRequest[]) => void
 ): Unsubscribe => {
-  const q = query(
-    collection(db, 'friendRequests'),
-    where('to', '==', uid),
-    where('status', '==', 'pending'),
-    orderBy('createdAt', 'desc')
-  );
+  const q = query(collection(db, 'friendRequests'), where('to', '==', uid));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() } as FriendRequest)));
+    callback(
+      snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as FriendRequest))
+        .filter((r) => r.status === 'pending')
+    );
   });
 };
 
@@ -835,23 +830,21 @@ export const checkFriendship = async (
   const friendSnap = await getDoc(doc(db, 'users', currentUid, 'friends', targetUid));
   if (friendSnap.exists()) return 'friend';
 
-  const sentQ = query(
-    collection(db, 'friendRequests'),
-    where('from', '==', currentUid),
-    where('to', '==', targetUid),
-    where('status', '==', 'pending')
-  );
+  // Check sent request
+  const sentQ = query(collection(db, 'friendRequests'), where('from', '==', currentUid));
   const sentSnap = await getDocs(sentQ);
-  if (!sentSnap.empty) return 'sent';
+  for (const d of sentSnap.docs) {
+    const data = d.data();
+    if (data.to === targetUid && data.status === 'pending') return 'sent';
+  }
 
-  const receivedQ = query(
-    collection(db, 'friendRequests'),
-    where('from', '==', targetUid),
-    where('to', '==', currentUid),
-    where('status', '==', 'pending')
-  );
+  // Check received request
+  const receivedQ = query(collection(db, 'friendRequests'), where('to', '==', currentUid));
   const receivedSnap = await getDocs(receivedQ);
-  if (!receivedSnap.empty) return 'pending';
+  for (const d of receivedSnap.docs) {
+    const data = d.data();
+    if (data.from === targetUid && data.status === 'pending') return 'pending';
+  }
 
   return 'none';
 };
