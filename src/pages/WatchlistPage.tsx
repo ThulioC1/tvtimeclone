@@ -319,9 +319,37 @@ const WatchlistPage: React.FC = () => {
         item.episode.episode_number,
         runtime
       );
-      setUpNext((prev) => prev.filter((i) => i !== item));
       setRecentlyWatched((prev) => [item, ...prev]);
       setShowRecent(true);
+
+      // Reload the next unwatched episode for this show and move it to the top
+      try {
+        const watched = await new Promise<Set<string>>((resolve) => {
+          const unsub = subscribeToWatchedEpisodes(user.uid, Number(item.show.showId), (ids) => {
+            resolve(ids);
+            unsub();
+          });
+        });
+        const all = item.show.source === 'tmdb'
+          ? await tmdbGetAllEpisodes(Number(item.show.showId)).catch(() => tvmazeGetAllEpisodes(Number(item.show.showId)))
+          : await tvmazeGetAllEpisodes(Number(item.show.showId));
+        const now = new Date();
+        const nextEp = all.find(
+          (e) =>
+            !watched.has(getEpisodeId(e.season_number, e.episode_number)) &&
+            (!e.air_date || new Date(e.air_date) <= now)
+        );
+        setUpNext((prev) => {
+          const withoutCurrent = prev.filter((i) => i.show.showId !== item.show.showId);
+          if (nextEp) {
+            return [{ show: item.show, episode: nextEp }, ...withoutCurrent];
+          }
+          return withoutCurrent;
+        });
+      } catch {
+        // If reload fails, just remove the current item
+        setUpNext((prev) => prev.filter((i) => i !== item));
+      }
     } finally {
       setMarkingId(null);
     }
