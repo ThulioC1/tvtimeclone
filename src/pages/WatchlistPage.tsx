@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import {
   subscribeToUserShows,
@@ -10,8 +11,8 @@ import {
   type UserShow,
   type ShowStatus,
 } from '../lib/firestore';
-import { getPosterUrl, getAllEpisodes as tmdbGetAllEpisodes, type TVEpisode } from '../lib/tmdb';
-import { getAllEpisodesSorted as tvmazeGetAllEpisodes } from '../lib/tvmaze';
+import { getPosterUrl, getAllEpisodes as tmdbGetAllEpisodes, getReleasedEpisodesCount as tmdbGetReleasedCount, type TVEpisode } from '../lib/tmdb';
+import { getAllEpisodesSorted as tvmazeGetAllEpisodes, getReleasedEpisodesCount as tvmazeGetReleasedCount } from '../lib/tvmaze';
 
 const STATUS_LABELS: Record<ShowStatus, string> = {
   watching: 'Assistindo',
@@ -54,9 +55,6 @@ const MOVIE_FILTER_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 'plan_to_watch', label: 'Quero assistir' },
 ];
 
-const isUpToDate = (show: UserShow): boolean =>
-  show.status === 'watching' && show.watchedCount > 0 && show.watchedCount >= show.totalEpisodes;
-
 interface UpNextItem {
   show: UserShow;
   episode: TVEpisode;
@@ -65,9 +63,11 @@ interface UpNextItem {
 const ShowCard = ({
   show,
   onRemove,
+  isUpToDate,
 }: {
   show: UserShow;
   onRemove: () => void;
+  isUpToDate: (show: UserShow) => boolean;
 }) => {
   const posterUrl = getPosterUrl(show.posterPath, 'w342');
   const displayLabel = isUpToDate(show) ? 'Em dia' : STATUS_LABELS[show.status];
@@ -223,6 +223,42 @@ const WatchlistPage: React.FC = () => {
   const [removingId, setRemovingId] = useState<string | number | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
+  // Cache released episodes count per show using React Query
+  const getReleasedCount = async (show: UserShow): Promise<number> => {
+    if (show.mediaType === 'movie') return show.totalEpisodes; // Movies are single items
+    if (show.source === 'tmdb') {
+      return tmdbGetReleasedCount(Number(show.showId));
+    }
+    return tvmazeGetReleasedCount(Number(show.showId));
+  };
+
+  const { data: releasedCounts } = useQuery({
+    queryKey: ['releasedCounts', shows.map((s) => `${s.source}-${s.showId}`)],
+    queryFn: async () => {
+      const counts: Record<string, number> = {};
+      const watchingShows = shows.filter((s) => s.status === 'watching' && s.mediaType !== 'movie');
+      for (const show of watchingShows) {
+        try {
+          const key = `${show.source}-${show.showId}`;
+          counts[key] = await getReleasedCount(show);
+        } catch {
+          counts[`${show.source}-${show.showId}`] = show.totalEpisodes; // fallback
+        }
+      }
+      return counts;
+    },
+    staleTime: 3600000, // 1 hour - episode air dates don't change often
+    enabled: shows.length > 0,
+  });
+
+  // Check if a show is "up to date" based on RELEASED episodes (not total)
+  const isUpToDate = useMemo(() => (show: UserShow): boolean => {
+    if (show.status !== 'watching' || show.mediaType === 'movie') return false;
+    const key = `${show.source}-${show.showId}`;
+    const releasedTotal = releasedCounts?.[key] ?? show.totalEpisodes;
+    return show.watchedCount > 0 && show.watchedCount >= releasedTotal;
+  }, [releasedCounts]);
+
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeToUserShows(user.uid, setShows);
@@ -245,12 +281,22 @@ const WatchlistPage: React.FC = () => {
         const all = show.source === 'tmdb'
           ? await tmdbGetAllEpisodes(Number(show.showId)).catch(() => tvmazeGetAllEpisodes(Number(show.showId)))
           : await tvmazeGetAllEpisodes(Number(show.showId));
-        const next = all.find((e) => !watched.has(getEpisodeId(e.season_number, e.episode_number)));
+        const now = new Date();
+        const next = all.find(
+          (e) =>
+            !watched.has(getEpisodeId(e.season_number, e.episode_number)) &&
+            (!e.air_date || new Date(e.air_date) <= now)
+        );
         if (next) items.push({ show, episode: next });
       } catch {
         // ignore series that fail to load
       }
     }
+    items.sort((a, b) => {
+      const ta = a.show.lastWatchedAt ? new Date(a.show.lastWatchedAt).getTime() : 0;
+      const tb = b.show.lastWatchedAt ? new Date(b.show.lastWatchedAt).getTime() : 0;
+      return tb - ta;
+    });
     setUpNext(items);
     setLoadingUpNext(false);
   }, [user, shows]);
@@ -465,6 +511,7 @@ const WatchlistPage: React.FC = () => {
                     <ShowCard
                       show={show}
                       onRemove={() => handleRemove(show.showId)}
+                      isUpToDate={isUpToDate}
                     />
                   </div>
                 ))

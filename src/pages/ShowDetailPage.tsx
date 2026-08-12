@@ -5,13 +5,18 @@ import { useAuth } from '../context/AuthContext';
 import {
   getTVShowDetails as tmdbGetShowDetails,
   getTVSeason as tmdbGetSeason,
+  getAllEpisodes as tmdbGetAllEpisodes,
   getPosterUrl,
   getBackdropUrl,
   getTVVideos,
   type TVSeason,
   type TVEpisode,
 } from '../lib/tmdb';
-import { getShowDetails as tvmazeGetShowDetails, getSeasonDetails as tvmazeGetSeason } from '../lib/tvmaze';
+import {
+  getShowDetails as tvmazeGetShowDetails,
+  getSeasonDetails as tvmazeGetSeason,
+  getAllEpisodesSorted as tvmazeGetAllEpisodes,
+} from '../lib/tvmaze';
 import {
   addShowToWatchlist,
   removeShowFromWatchlist,
@@ -534,6 +539,23 @@ const ShowDetailPage: React.FC = () => {
     enabled: !!showId && userShowsLoaded,
   });
 
+  // All episodes (with air_date) so we can find the current season/episode to resume.
+  const { data: allEpisodes } = useQuery({
+    queryKey: ['show-episodes', showId, userShow?.source],
+    queryFn: async () => {
+      if (userShow && userShow.source !== 'tmdb') {
+        return tvmazeGetAllEpisodes(showId);
+      }
+      try {
+        return await tmdbGetAllEpisodes(showId);
+      } catch {
+        return tvmazeGetAllEpisodes(showId);
+      }
+    },
+    enabled: !!showId && userShowsLoaded,
+    staleTime: 3600000,
+  });
+
   useEffect(() => {
     if (!user || !showId) return;
     const unsub1 = subscribeToWatchedEpisodeDocs(user.uid, showId, (docs) => {
@@ -639,8 +661,11 @@ const ShowDetailPage: React.FC = () => {
     }
   };
 
+  const releasedCount = (allEpisodes ?? []).filter(
+    (e) => !e.air_date || new Date(e.air_date) <= new Date()
+  ).length;
   const allWatched =
-    !!userShow && userShow.totalEpisodes > 0 && userShow.watchedCount >= userShow.totalEpisodes;
+    !!userShow && releasedCount > 0 && userShow.watchedCount >= releasedCount;
 
   const handleMarkAll = async () => {
     if (!user || !show) return;
@@ -725,8 +750,36 @@ const ShowDetailPage: React.FC = () => {
   const seasons = show.seasons?.filter((s) => s.season_number > 0) ?? [];
   const isInList = !!userShow;
 
+  // Determine the season to show by default: the season containing the next
+  // released-but-unwatched episode (resume where the user stopped). If everything
+  // released is watched, fall back to the season of the next unreleased episode.
+  const getActiveSeasonNumber = (): number | null => {
+    if (!seasons.length) return null;
+    const now = new Date();
+    const sorted = [...(allEpisodes ?? [])].sort(
+      (a, b) => a.season_number - b.season_number || a.episode_number - b.episode_number
+    );
+    const released = sorted.filter(
+      (e) => !e.air_date || new Date(e.air_date) <= now
+    );
+    const nextToWatch = released.find(
+      (e) => !watchedEpisodes.has(getEpisodeId(e.season_number, e.episode_number))
+    );
+    if (nextToWatch) return nextToWatch.season_number;
+
+    // Everything released is watched (up to date) → next unreleased episode's season,
+    // or the last known season as a fallback.
+    const unreleased = sorted.filter(
+      (e) => e.air_date && new Date(e.air_date) > now
+    );
+    if (unreleased.length > 0) return unreleased[0].season_number;
+
+    const lastSeason = seasons[seasons.length - 1];
+    return lastSeason ? lastSeason.season_number : seasons[0].season_number;
+  };
+
   const activeSeasonNumber =
-    selectedSeason ?? seasons[0]?.season_number ?? null;
+    selectedSeason ?? getActiveSeasonNumber();
   const activeSeason =
     activeSeasonNumber != null
       ? seasons.find((s) => s.season_number === activeSeasonNumber) ?? null

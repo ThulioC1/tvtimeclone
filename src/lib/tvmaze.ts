@@ -298,3 +298,15 @@ export const getAllEpisodesSorted = async (showId: number): Promise<TVEpisode[]>
     .sort((a, b) => a.season - b.season || a.number - b.number)
     .map(normalizeEpisode);
 };
+
+export const getReleasedEpisodesCount = async (showId: number): Promise<number> => {
+  try {
+    const episodes = await fetchJson<RawEpisode[]>(`/shows/${showId}/episodes`);
+    const now = new Date();
+    return episodes
+      .map(normalizeEpisode)
+      .filter((e) => e.air_date && new Date(e.air_date) <= now).length;
+  } catch {
+    return 0;
+  }
+};

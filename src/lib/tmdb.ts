@@ -315,6 +315,27 @@ export const getMovieVideos = async (movieId: number): Promise<{ key: string; si
   } catch { return []; }
 };
 
+export const getReleasedEpisodesCount = async (showId: number): Promise<number> => {
+  try {
+    const show = await fetchTMDB<{ seasons: RawSeason[] }>(`/tv/${showId}`, { language: 'pt-BR' });
+    const seasons = (show.seasons ?? []).filter((s) => s.season_number > 0);
+    const now = new Date();
+    let count = 0;
+    for (const season of seasons) {
+      try {
+        const seasonData = await fetchTMDB<{ episodes: RawEpisode[] }>(`/tv/${showId}/season/${season.season_number}`, { language: 'pt-BR' });
+        const episodes = (seasonData.episodes ?? []).map(normalizeEpisode);
+        count += episodes.filter((e) => e.air_date && new Date(e.air_date) <= now).length;
+      } catch {
+        // If season fetch fails, skip it
+      }
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+};
+
 const normalizeTVShow = (raw: RawTVShow): TVShow => ({
   id: raw.id,
   name: raw.name,
