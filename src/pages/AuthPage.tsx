@@ -100,11 +100,11 @@ const AuthPage: React.FC = () => {
       {/* Carousel panel: fixed background on mobile, left half on desktop */}
       <div className="fixed inset-0 md:static md:min-h-screen md:flex-1 md:relative">
         <BackgroundCarousel />
-        <div className="absolute inset-0 bg-dark-900/65 md:bg-gradient-to-r md:from-dark-900/90 md:via-dark-900/40 md:to-transparent" />
+        <div className="absolute inset-0 bg-dark-900/65 md:bg-gradient-to-r md:from-dark-900/55 md:via-dark-900/35 md:to-dark-900" />
       </div>
 
       {/* Form panel */}
-      <div className="relative z-10 flex items-center justify-center min-h-screen p-4 md:w-[45%] md:shrink-0 lg:w-[42%] md:bg-dark-900/60 md:backdrop-blur-sm">
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-4 md:w-[45%] md:shrink-0 lg:w-[42%] md:px-10 lg:px-16">
         <div className="w-full max-w-md animation-slide-up">
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
