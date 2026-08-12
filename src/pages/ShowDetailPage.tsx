@@ -671,13 +671,19 @@ const ShowDetailPage: React.FC = () => {
     if (!user || !show) return;
     setMarkingAll(true);
     try {
+      const now = new Date();
       const episodes: { seasonNumber: number; episodeNumber: number; runtime?: number | null }[] = [];
+      let hasUnreleased = false;
       for (const season of show.seasons ?? []) {
         if (season.season_number <= 0) continue;
         let data;
         try { data = await tmdbGetSeason(showId, season.season_number); }
         catch { data = await tvmazeGetSeason(showId, season.season_number); }
         for (const ep of data.episodes ?? []) {
+          if (ep.air_date && new Date(ep.air_date) > now) {
+            hasUnreleased = true;
+            continue;
+          }
           episodes.push({
             seasonNumber: ep.season_number,
             episodeNumber: ep.episode_number,
@@ -692,8 +698,9 @@ const ShowDetailPage: React.FC = () => {
         }
       } else {
         await markAllEpisodesWatched(user.uid, showId, episodes);
-        if (userShow?.status !== 'completed') {
-          await updateShowStatus(user.uid, showId, 'completed');
+        const nextStatus = hasUnreleased ? 'watching' : 'completed';
+        if (userShow?.status !== nextStatus) {
+          await updateShowStatus(user.uid, showId, nextStatus);
         }
       }
     } catch (err) {
@@ -709,11 +716,14 @@ const ShowDetailPage: React.FC = () => {
       let data;
       try { data = await tmdbGetSeason(showId, seasonNumber); }
       catch { data = await tvmazeGetSeason(showId, seasonNumber); }
-      const episodes = (data.episodes ?? []).map((ep) => ({
-        seasonNumber: ep.season_number,
-        episodeNumber: ep.episode_number,
-        runtime: ep.runtime ?? null,
-      }));
+      const now = new Date();
+      const episodes = (data.episodes ?? [])
+        .filter((ep) => !ep.air_date || new Date(ep.air_date) <= now)
+        .map((ep) => ({
+          seasonNumber: ep.season_number,
+          episodeNumber: ep.episode_number,
+          runtime: ep.runtime ?? null,
+        }));
       await markSeasonWatched(user.uid, showId, seasonNumber, episodes);
     } catch (err) {
       console.error('Erro ao marcar temporada:', err);
