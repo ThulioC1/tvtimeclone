@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import BackgroundCarousel from '../components/auth/BackgroundCarousel';
 
 type AuthTab = 'login' | 'register' | 'forgot';
 
@@ -95,22 +96,24 @@ const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-brand-600/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-brand-600/10 rounded-full blur-3xl" />
+    <div className="relative min-h-screen bg-dark-900 md:flex md:items-stretch overflow-hidden">
+      {/* Carousel panel: fixed background on mobile, left half on desktop */}
+      <div className="fixed inset-0 md:static md:min-h-screen md:flex-1 md:relative">
+        <BackgroundCarousel />
+        <div className="absolute inset-0 bg-dark-900/65 md:bg-gradient-to-r md:from-dark-900/90 md:via-dark-900/40 md:to-transparent" />
       </div>
 
-      <div className="w-full max-w-md relative z-10 animation-slide-up">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="p-3 bg-dark-700 rounded-2xl border border-white/10 mb-4 shadow-lg shadow-brand-900/30">
-            <AppLogo />
+      {/* Form panel */}
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-4 md:w-[45%] md:shrink-0 lg:w-[42%] md:bg-dark-900/60 md:backdrop-blur-sm">
+        <div className="w-full max-w-md animation-slide-up">
+          {/* Logo */}
+          <div className="flex flex-col items-center mb-8">
+            <div className="p-3 bg-dark-700/90 rounded-2xl border border-white/10 mb-4 shadow-lg shadow-brand-900/30 backdrop-blur-sm">
+              <AppLogo />
+            </div>
+            <h1 className="text-3xl font-bold gradient-text">Time to Watch</h1>
+            <p className="text-gray-400 text-sm mt-1">Rastreie o que você assiste</p>
           </div>
-          <h1 className="text-3xl font-bold gradient-text">Time to Watch</h1>
-          <p className="text-gray-400 text-sm mt-1">Rastreie o que você assiste</p>
-        </div>
 
         <div className="card p-8">
           {/* Tabs */}
@@ -257,6 +260,7 @@ const AuthPage: React.FC = () => {
               </button>
             </>
           )}
+        </div>
         </div>
       </div>
     </div>

@@ -138,6 +138,16 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Slow zoom effect for carousel slides (Ken Burns style). */
+@keyframes kenBurns {
+  from { transform: scale(1.02); }
+  to { transform: scale(1.12); }
+}
+
+.ken-burns {
+  animation: kenBurns 12s ease-out forwards;
+}
+
 .active-show-glow {
   box-shadow: 0 0 30px rgba(99, 102, 241, 0.12);
 }
