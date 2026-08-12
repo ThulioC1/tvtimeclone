@@ -216,8 +216,17 @@ const WatchlistPage: React.FC = () => {
   const [shows, setShows] = useState<UserShow[]>([]);
   const [mainTab, setMainTab] = useState<'upnext' | 'series' | 'movies'>('upnext');
   const [upNext, setUpNext] = useState<UpNextItem[]>([]);
-  const [recentlyWatched, setRecentlyWatched] = useState<UpNextItem[]>([]);
-  const [showRecent, setShowRecent] = useState(false);
+  const [recentlyWatched, setRecentlyWatched] = useState<UpNextItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('recentlyWatched');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [showRecent, setShowRecent] = useState(() => {
+    try {
+      return localStorage.getItem('showRecent') === 'true';
+    } catch { return false; }
+  });
   const [loadingUpNext, setLoadingUpNext] = useState(true);
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | number | null>(null);
@@ -260,6 +269,14 @@ const WatchlistPage: React.FC = () => {
   }, [releasedCounts]);
 
   useEffect(() => {
+    try { localStorage.setItem('recentlyWatched', JSON.stringify(recentlyWatched)); } catch {}
+  }, [recentlyWatched]);
+
+  useEffect(() => {
+    try { localStorage.setItem('showRecent', String(showRecent)); } catch {}
+  }, [showRecent]);
+
+  useEffect(() => {
     if (!user) return;
     const unsub = subscribeToUserShows(user.uid, setShows);
     return unsub;
@@ -270,6 +287,7 @@ const WatchlistPage: React.FC = () => {
     setLoadingUpNext(true);
     const watching = shows.filter((s) => s.status === 'watching' && s.mediaType !== 'movie');
     const items: UpNextItem[] = [];
+    const watchedByShow: Record<string, Set<string>> = {};
     for (const show of watching) {
       try {
         const watched = await new Promise<Set<string>>((resolve) => {
@@ -278,6 +296,7 @@ const WatchlistPage: React.FC = () => {
             unsub();
           });
         });
+        watchedByShow[String(show.showId)] = watched;
         const all = show.source === 'tmdb'
           ? await tmdbGetAllEpisodes(Number(show.showId)).catch(() => tvmazeGetAllEpisodes(Number(show.showId)))
           : await tvmazeGetAllEpisodes(Number(show.showId));
@@ -292,12 +311,36 @@ const WatchlistPage: React.FC = () => {
         // ignore series that fail to load
       }
     }
+    const getTimestamp = (val: any): number => {
+      if (!val) return 0;
+      if (typeof val.toDate === 'function') return val.toDate().getTime();
+      if (typeof val.seconds === 'number') return val.seconds * 1000;
+      if (val instanceof Date) return val.getTime();
+      const parsed = new Date(val).getTime();
+      return isNaN(parsed) ? 0 : parsed;
+    };
     items.sort((a, b) => {
-      const ta = a.show.lastWatchedAt ? new Date(a.show.lastWatchedAt).getTime() : 0;
-      const tb = b.show.lastWatchedAt ? new Date(b.show.lastWatchedAt).getTime() : 0;
+      const ta = getTimestamp(a.show.lastWatchedAt);
+      const tb = getTimestamp(b.show.lastWatchedAt);
       return tb - ta;
     });
     setUpNext(items);
+    // Clean up recentlyWatched: remove episodes that are no longer marked
+    // Only clean up if we actually loaded show data (avoid wiping on initial empty render)
+    const checkedShowIds = Object.keys(watchedByShow);
+    if (checkedShowIds.length > 0) {
+      setRecentlyWatched((prev) => {
+        const filtered = prev.filter((item) => {
+          const showId = String(item.show.showId);
+          const watched = watchedByShow[showId];
+          // Only remove if we checked this show and the episode is no longer watched
+          if (!watched) return true; // show wasn't checked, keep the item
+          const epId = getEpisodeId(item.episode.season_number, item.episode.episode_number);
+          return watched.has(epId);
+        });
+        return filtered.length !== prev.length ? filtered : prev;
+      });
+    }
     setLoadingUpNext(false);
   }, [user, shows]);
 
