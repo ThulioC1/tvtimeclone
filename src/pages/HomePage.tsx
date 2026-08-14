@@ -190,13 +190,13 @@ const StatCard = ({
     title={title || label}
     className="card p-2.5 sm:p-4 flex flex-col items-center justify-center text-center min-w-0 w-full transition-all duration-200 cursor-pointer hover:border-brand-500/50 hover:bg-dark-700/80 hover:scale-[1.03] active:scale-[0.98] group relative"
   >
-    <p className="text-lg sm:text-2xl font-extrabold gradient-text leading-none break-words w-full group-hover:brightness-110 transition-all">{value}</p>
-    <p className="text-[9px] sm:text-[10px] text-gray-400 mt-1 leading-tight break-words w-full flex items-center justify-center gap-0.5 group-hover:text-gray-200 transition-colors">
-      <span>{label}</span>
-      <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+    <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 opacity-0 group-hover:opacity-100 transition-opacity text-brand-400">
+      <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
         <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
       </svg>
-    </p>
+    </div>
+    <p className="text-lg sm:text-2xl font-extrabold gradient-text leading-none break-words w-full text-center group-hover:brightness-110 transition-all">{value}</p>
+    <p className="text-[9px] sm:text-[10px] text-gray-400 mt-1.5 leading-tight break-words w-full text-center group-hover:text-gray-200 transition-colors">{label}</p>
   </button>
 );
 
