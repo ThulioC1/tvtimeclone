@@ -6,7 +6,8 @@ import { subscribeToUserShows, setBannerShow, getBannerUrl, subscribeToFollowing
 import { getBackdropUrl } from '../lib/tmdb';
 import { formatWatchTimeShort } from '../lib/format';
 import BannerPickerModal from '../components/BannerPickerModal';
-import { getTrendingTVShows, getTrendingMovies, getPosterUrl, type TVShow, type TMDBMovieSimple } from '../lib/tmdb';
+import { getTrendingTVShows, getTrendingMovies, getPosterUrl, getAllEpisodes as tmdbGetAllEpisodes, type TVShow, type TMDBMovieSimple } from '../lib/tmdb';
+import { getAllEpisodesSorted as tvmazeGetAllEpisodes } from '../lib/tvmaze';
 
 const StarIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-yellow-400">
@@ -118,6 +119,30 @@ const ListShowRow = ({ show }: { show: UserShow }) => {
   const posterUrl = getPosterUrl(show.posterPath);
   const progress = show.totalEpisodes > 0 ? (show.watchedCount / show.totalEpisodes) * 100 : 0;
   const lastEp = show.lastWatchedEpisode;
+
+  // Dynamic resolution for legacy user shows without lastWatchedEpisode saved in Firestore
+  const { data: fetchedLastEp } = useQuery({
+    queryKey: ['show-last-ep', show.showId, show.source, show.watchedCount],
+    queryFn: async () => {
+      if (show.watchedCount <= 0) return null;
+      const all = show.source === 'tmdb'
+        ? await tmdbGetAllEpisodes(Number(show.showId)).catch(() => tvmazeGetAllEpisodes(Number(show.showId)))
+        : await tvmazeGetAllEpisodes(Number(show.showId));
+      const epIndex = Math.min(show.watchedCount - 1, all.length - 1);
+      const ep = all[epIndex];
+      if (!ep) return null;
+      return {
+        seasonNumber: ep.season_number,
+        episodeNumber: ep.episode_number,
+        name: ep.name,
+      };
+    },
+    enabled: !lastEp && show.watchedCount > 0,
+    staleTime: 3600000,
+  });
+
+  const displayEp = lastEp || fetchedLastEp;
+
   return (
     <Link to={`/show/${show.showId}`} className="card-hover flex items-center gap-3 p-3">
       <div className="w-10 h-14 rounded-lg overflow-hidden bg-dark-500 shrink-0">
@@ -129,9 +154,9 @@ const ListShowRow = ({ show }: { show: UserShow }) => {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-white truncate">{show.title}</p>
-        {lastEp ? (
+        {displayEp ? (
           <p className="text-xs text-brand-400 font-medium truncate">
-            T{lastEp.seasonNumber} · E{lastEp.episodeNumber}{lastEp.name ? ` — ${lastEp.name}` : ''}
+            T{displayEp.seasonNumber} · E{displayEp.episodeNumber}{displayEp.name ? ` — ${displayEp.name}` : ''}
           </p>
         ) : (
           <p className="text-xs text-gray-400 truncate">
