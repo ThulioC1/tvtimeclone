@@ -6,7 +6,7 @@ import {
   subscribeToUserShows,
   removeShowFromWatchlist,
   markEpisodeWatched,
-  subscribeToWatchedEpisodes,
+  getWatchedEpisodes,
   getEpisodeId,
   type UserShow,
   type ShowStatus,
@@ -286,31 +286,30 @@ const WatchlistPage: React.FC = () => {
     if (!user) return;
     setLoadingUpNext(true);
     const watching = shows.filter((s) => s.status === 'watching' && s.mediaType !== 'movie');
-    const items: UpNextItem[] = [];
-    const watchedByShow: Record<string, Set<string>> = {};
-    for (const show of watching) {
-      try {
-        const watched = await new Promise<Set<string>>((resolve) => {
-          const unsub = subscribeToWatchedEpisodes(user.uid, Number(show.showId), (ids) => {
-            resolve(ids);
-            unsub();
-          });
-        });
-        watchedByShow[String(show.showId)] = watched;
-        const all = show.source === 'tmdb'
-          ? await tmdbGetAllEpisodes(Number(show.showId)).catch(() => tvmazeGetAllEpisodes(Number(show.showId)))
-          : await tvmazeGetAllEpisodes(Number(show.showId));
-        const now = new Date();
-        const next = all.find(
-          (e) =>
-            !watched.has(getEpisodeId(e.season_number, e.episode_number)) &&
-            (!e.air_date || new Date(e.air_date) <= now)
-        );
-        if (next) items.push({ show, episode: next });
-      } catch {
-        // ignore series that fail to load
-      }
-    }
+
+    const results = await Promise.all(
+      watching.map(async (show) => {
+        try {
+          const watched = await getWatchedEpisodes(user.uid, Number(show.showId));
+          const all = show.source === 'tmdb'
+            ? await tmdbGetAllEpisodes(Number(show.showId)).catch(() => tvmazeGetAllEpisodes(Number(show.showId)))
+            : await tvmazeGetAllEpisodes(Number(show.showId));
+          const now = new Date();
+          const next = all.find(
+            (e) =>
+              !watched.has(getEpisodeId(e.season_number, e.episode_number)) &&
+              (!e.air_date || new Date(e.air_date) <= now)
+          );
+          if (next) return { show, episode: next };
+        } catch {
+          // ignore series that fail to load
+        }
+        return null;
+      })
+    );
+
+    const items = results.filter((item): item is UpNextItem => item !== null);
+
     const getTimestamp = (val: any): number => {
       if (!val) return 0;
       if (typeof val.toDate === 'function') return val.toDate().getTime();
@@ -319,28 +318,14 @@ const WatchlistPage: React.FC = () => {
       const parsed = new Date(val).getTime();
       return isNaN(parsed) ? 0 : parsed;
     };
+
     items.sort((a, b) => {
       const ta = getTimestamp(a.show.lastWatchedAt);
       const tb = getTimestamp(b.show.lastWatchedAt);
       return tb - ta;
     });
+
     setUpNext(items);
-    // Clean up recentlyWatched: remove episodes that are no longer marked
-    // Only clean up if we actually loaded show data (avoid wiping on initial empty render)
-    const checkedShowIds = Object.keys(watchedByShow);
-    if (checkedShowIds.length > 0) {
-      setRecentlyWatched((prev) => {
-        const filtered = prev.filter((item) => {
-          const showId = String(item.show.showId);
-          const watched = watchedByShow[showId];
-          // Only remove if we checked this show and the episode is no longer watched
-          if (!watched) return true; // show wasn't checked, keep the item
-          const epId = getEpisodeId(item.episode.season_number, item.episode.episode_number);
-          return watched.has(epId);
-        });
-        return filtered.length !== prev.length ? filtered : prev;
-      });
-    }
     setLoadingUpNext(false);
   }, [user, shows]);
 
@@ -360,19 +345,15 @@ const WatchlistPage: React.FC = () => {
         Number(item.show.showId),
         item.episode.season_number,
         item.episode.episode_number,
-        runtime
+        runtime,
+        item.episode.name
       );
       setRecentlyWatched((prev) => [item, ...prev]);
       setShowRecent(true);
 
       // Reload the next unwatched episode for this show and move it to the top
       try {
-        const watched = await new Promise<Set<string>>((resolve) => {
-          const unsub = subscribeToWatchedEpisodes(user.uid, Number(item.show.showId), (ids) => {
-            resolve(ids);
-            unsub();
-          });
-        });
+        const watched = await getWatchedEpisodes(user.uid, Number(item.show.showId));
         const all = item.show.source === 'tmdb'
           ? await tmdbGetAllEpisodes(Number(item.show.showId)).catch(() => tvmazeGetAllEpisodes(Number(item.show.showId)))
           : await tvmazeGetAllEpisodes(Number(item.show.showId));
@@ -383,15 +364,25 @@ const WatchlistPage: React.FC = () => {
             (!e.air_date || new Date(e.air_date) <= now)
         );
         setUpNext((prev) => {
-          const withoutCurrent = prev.filter((i) => i.show.showId !== item.show.showId);
+          const updatedShow = {
+            ...item.show,
+            lastWatchedAt: new Date(),
+            watchedCount: item.show.watchedCount + 1,
+            lastWatchedEpisode: {
+              seasonNumber: item.episode.season_number,
+              episodeNumber: item.episode.episode_number,
+              name: item.episode.name,
+            },
+          };
+          const withoutCurrent = prev.filter((i) => String(i.show.showId) !== String(item.show.showId));
           if (nextEp) {
-            return [{ show: item.show, episode: nextEp }, ...withoutCurrent];
+            return [{ show: updatedShow, episode: nextEp }, ...withoutCurrent];
           }
           return withoutCurrent;
         });
       } catch {
         // If reload fails, just remove the current item
-        setUpNext((prev) => prev.filter((i) => i !== item));
+        setUpNext((prev) => prev.filter((i) => String(i.show.showId) !== String(item.show.showId)));
       }
     } finally {
       setMarkingId(null);

@@ -49,6 +49,11 @@ export interface UserShow {
   watchedCount: number;
   addedAt: Date;
   lastWatchedAt: Date | null;
+  lastWatchedEpisode?: {
+    seasonNumber: number;
+    episodeNumber: number;
+    name?: string;
+  } | null;
   totalSeasons: number;
   isFavorite: boolean;
   genres?: string[];
@@ -226,7 +231,8 @@ export const markEpisodeWatched = async (
   showId: number,
   seasonNumber: number,
   episodeNumber: number,
-  runtime?: number
+  runtime?: number,
+  episodeName?: string
 ): Promise<void> => {
   const episodeId = getEpisodeId(seasonNumber, episodeNumber);
   const ref = doc(db, 'users', uid, 'userShows', String(showId), 'episodes', episodeId);
@@ -242,6 +248,7 @@ export const markEpisodeWatched = async (
   await setDoc(ref, {
     seasonNumber,
     episodeNumber,
+    name: episodeName || '',
     watchedAt: serverTimestamp(),
     runtime: effectiveRuntime,
   });
@@ -253,6 +260,11 @@ export const markEpisodeWatched = async (
     await updateDoc(showRef, {
       watchedCount: current.watchedCount + 1,
       lastWatchedAt: serverTimestamp(),
+      lastWatchedEpisode: {
+        seasonNumber,
+        episodeNumber,
+        name: episodeName || '',
+      },
     });
   }
 
@@ -302,23 +314,33 @@ export const unmarkEpisodeWatched = async (
   if (showSnap.exists()) {
     const current = showSnap.data() as UserShow;
 
-    // Recalculate lastWatchedAt from remaining episodes
+    // Recalculate lastWatchedAt & lastWatchedEpisode from remaining episodes
     const remainingEps = await getDocs(
       collection(db, 'users', uid, 'userShows', String(showId), 'episodes')
     );
     let latestWatchedAt: any = null;
+    let latestEpData: { seasonNumber: number; episodeNumber: number; name?: string } | null = null;
     remainingEps.docs.forEach((d) => {
-      const wa = d.data().watchedAt;
+      const data = d.data();
+      const wa = data.watchedAt;
       if (!wa) return;
-      if (!latestWatchedAt) { latestWatchedAt = wa; return; }
       const waTime = typeof wa.toDate === 'function' ? wa.toDate().getTime() : new Date(wa).getTime();
+      if (!latestWatchedAt) {
+        latestWatchedAt = wa;
+        latestEpData = { seasonNumber: data.seasonNumber, episodeNumber: data.episodeNumber, name: data.name };
+        return;
+      }
       const curTime = typeof latestWatchedAt.toDate === 'function' ? latestWatchedAt.toDate().getTime() : new Date(latestWatchedAt).getTime();
-      if (waTime > curTime) latestWatchedAt = wa;
+      if (waTime > curTime) {
+        latestWatchedAt = wa;
+        latestEpData = { seasonNumber: data.seasonNumber, episodeNumber: data.episodeNumber, name: data.name };
+      }
     });
 
     await updateDoc(showRef, {
       watchedCount: Math.max(0, current.watchedCount - 1),
       lastWatchedAt: latestWatchedAt,
+      lastWatchedEpisode: latestEpData,
     });
   }
 

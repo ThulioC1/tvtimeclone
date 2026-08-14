@@ -117,6 +117,7 @@ const MovieCard = ({ movie }: { movie: TMDBMovieSimple }) => {
 const ListShowRow = ({ show }: { show: UserShow }) => {
   const posterUrl = getPosterUrl(show.posterPath);
   const progress = show.totalEpisodes > 0 ? (show.watchedCount / show.totalEpisodes) * 100 : 0;
+  const lastEp = show.lastWatchedEpisode;
   return (
     <Link to={`/show/${show.showId}`} className="card-hover flex items-center gap-3 p-3">
       <div className="w-10 h-14 rounded-lg overflow-hidden bg-dark-500 shrink-0">
@@ -128,9 +129,15 @@ const ListShowRow = ({ show }: { show: UserShow }) => {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-white truncate">{show.title}</p>
-        <p className="text-xs text-gray-400 truncate">
-          {show.watchedCount}/{show.totalEpisodes} eps
-        </p>
+        {lastEp ? (
+          <p className="text-xs text-brand-400 font-medium truncate">
+            T{lastEp.seasonNumber} · E{lastEp.episodeNumber}{lastEp.name ? ` — ${lastEp.name}` : ''}
+          </p>
+        ) : (
+          <p className="text-xs text-gray-400 truncate">
+            {show.watchedCount}/{show.totalEpisodes} eps
+          </p>
+        )}
       </div>
       <div className="w-16 shrink-0">
         <div className="progress-bar">

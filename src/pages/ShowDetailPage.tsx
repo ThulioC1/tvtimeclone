@@ -652,7 +652,7 @@ const ShowDetailPage: React.FC = () => {
       if (watchedEpisodes.has(id)) {
         await unmarkEpisodeWatched(user.uid, showId, episode.season_number, episode.episode_number, effectiveRuntime);
       } else {
-        await markEpisodeWatched(user.uid, showId, episode.season_number, episode.episode_number, effectiveRuntime);
+        await markEpisodeWatched(user.uid, showId, episode.season_number, episode.episode_number, effectiveRuntime, episode.name);
       }
     } catch (err) {
       console.error('Erro ao marcar episódio:', err);
