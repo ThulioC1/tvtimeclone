@@ -222,11 +222,11 @@ const WatchedEpisodesModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto bg-dark-900 rounded-t-2xl sm:rounded-2xl p-5 border border-dark-700 shadow-2xl shadow-black relative z-10"
+        className="w-full sm:max-w-md max-h-[80vh] overflow-y-auto bg-dark-900 rounded-2xl p-5 border border-dark-700 shadow-2xl shadow-black relative z-10"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-dark-700">
@@ -313,11 +313,11 @@ const WatchTimeModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto bg-dark-900 rounded-t-2xl sm:rounded-2xl p-5 border border-dark-700 shadow-2xl shadow-black relative z-10"
+        className="w-full sm:max-w-md max-h-[80vh] overflow-y-auto bg-dark-900 rounded-2xl p-5 border border-dark-700 shadow-2xl shadow-black relative z-10"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-dark-700">

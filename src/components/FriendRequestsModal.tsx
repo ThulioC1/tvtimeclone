@@ -36,8 +36,8 @@ const FriendRequestsModal: React.FC<Props> = ({ open, uid, onClose }) => {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4" onClick={onClose}>
-      <div className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto bg-dark-850 rounded-t-2xl sm:rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={onClose}>
+      <div className="w-full sm:max-w-md max-h-[80vh] overflow-y-auto bg-dark-900 rounded-2xl p-5 border border-dark-700 shadow-2xl relative z-10" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-white">Solicitações</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none">×</button>
