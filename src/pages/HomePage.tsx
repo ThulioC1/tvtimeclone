@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToUserShows, setBannerShow, getBannerUrl, subscribeToFollowing, type UserShow, type FollowingInfo } from '../lib/firestore';
@@ -173,17 +173,206 @@ const ListShowRow = ({ show }: { show: UserShow }) => {
   );
 };
 
-const StatCard = ({ value, label }: { value: number | string; label: string }) => (
-  <div className="card p-2.5 sm:p-4 flex flex-col items-center justify-center text-center min-w-0">
-    <p className="text-lg sm:text-2xl font-extrabold gradient-text leading-none break-words w-full">{value}</p>
-    <p className="text-[9px] sm:text-[10px] text-gray-400 mt-1 leading-tight break-words w-full">{label}</p>
-  </div>
+const StatCard = ({
+  value,
+  label,
+  onClick,
+  title,
+}: {
+  value: number | string;
+  label: string;
+  onClick?: () => void;
+  title?: string;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={title || label}
+    className="card p-2.5 sm:p-4 flex flex-col items-center justify-center text-center min-w-0 w-full transition-all duration-200 cursor-pointer hover:border-brand-500/50 hover:bg-dark-700/80 hover:scale-[1.03] active:scale-[0.98] group relative"
+  >
+    <p className="text-lg sm:text-2xl font-extrabold gradient-text leading-none break-words w-full group-hover:brightness-110 transition-all">{value}</p>
+    <p className="text-[9px] sm:text-[10px] text-gray-400 mt-1 leading-tight break-words w-full flex items-center justify-center gap-0.5 group-hover:text-gray-200 transition-colors">
+      <span>{label}</span>
+      <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+      </svg>
+    </p>
+  </button>
 );
 
+const WatchedEpisodesModal = ({
+  open,
+  onClose,
+  shows,
+  totalWatched,
+}: {
+  open: boolean;
+  onClose: () => void;
+  shows: UserShow[];
+  totalWatched: number;
+}) => {
+  if (!open) return null;
+
+  const seriesWithEps = shows
+    .filter((s) => s.mediaType !== 'movie' && s.watchedCount > 0)
+    .sort((a, b) => b.watchedCount - a.watchedCount);
+
+  const watchingCount = shows.filter((s) => s.mediaType !== 'movie' && s.status === 'watching').length;
+  const avgPerSeries = shows.length > 0 ? (totalWatched / shows.length).toFixed(1) : '0';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4 animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto bg-dark-850 rounded-t-2xl sm:rounded-2xl p-5 border border-dark-700 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-dark-700">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-brand-500/10 text-brand-400">
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white leading-none">Estatísticas de Episódios</h3>
+              <p className="text-xs text-gray-400 mt-1">Resumo das suas maratonas</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none">×</button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          <div className="bg-dark-800 p-3 rounded-xl text-center border border-dark-700">
+            <p className="text-lg font-bold text-brand-400 leading-none">{totalWatched}</p>
+            <p className="text-[10px] text-gray-400 mt-1">Total assistido</p>
+          </div>
+          <div className="bg-dark-800 p-3 rounded-xl text-center border border-dark-700">
+            <p className="text-lg font-bold text-teal-400 leading-none">{watchingCount}</p>
+            <p className="text-[10px] text-gray-400 mt-1">Assistindo</p>
+          </div>
+          <div className="bg-dark-800 p-3 rounded-xl text-center border border-dark-700">
+            <p className="text-lg font-bold text-purple-400 leading-none">{avgPerSeries}</p>
+            <p className="text-[10px] text-gray-400 mt-1">Média/série</p>
+          </div>
+        </div>
+
+        <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">Top Séries Assistidas</h4>
+        {seriesWithEps.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">Nenhum episódio registrado ainda.</p>
+        ) : (
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {seriesWithEps.slice(0, 6).map((show) => {
+              const poster = getPosterUrl(show.posterPath, 'w92');
+              return (
+                <div key={show.showId} className="flex items-center gap-3 p-2 rounded-xl bg-dark-800/60 border border-dark-700/50">
+                  <div className="w-8 h-11 rounded bg-dark-700 overflow-hidden shrink-0">
+                    {poster ? (
+                      <img src={poster} alt={show.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-dark-600" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-white truncate">{show.title}</p>
+                    <p className="text-[10px] text-gray-400">{show.watchedCount} de {show.totalEpisodes} episódios</p>
+                  </div>
+                  <span className="text-xs font-bold text-brand-400 bg-brand-500/10 px-2 py-1 rounded-lg shrink-0">
+                    {show.watchedCount} ep
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const WatchTimeModal = ({
+  open,
+  onClose,
+  totalMinutes,
+}: {
+  open: boolean;
+  onClose: () => void;
+  totalMinutes: number;
+}) => {
+  if (!open) return null;
+
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const mins = totalMinutes % 60;
+
+  const totalHoursNum = (totalMinutes / 60).toFixed(1);
+  const moviesEquivalent = Math.round(totalMinutes / 120);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4 animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto bg-dark-850 rounded-t-2xl sm:rounded-2xl p-5 border border-dark-700 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-dark-700">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx="12" cy="12" r="9" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white leading-none">Tempo Assistido</h3>
+              <p className="text-xs text-gray-400 mt-1">Detalhamento das suas horas dedicadas</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none">×</button>
+        </div>
+
+        <div className="bg-gradient-to-br from-brand-600/20 to-purple-600/20 border border-brand-500/30 p-4 rounded-2xl text-center mb-5">
+          <p className="text-xs text-gray-300 font-medium uppercase tracking-wider">Tempo Total Acumulado</p>
+          <p className="text-2xl sm:text-3xl font-extrabold gradient-text mt-1">
+            {days > 0 ? `${days}d ` : ''}{hours}h {mins}m
+          </p>
+        </div>
+
+        <div className="space-y-3 mb-5">
+          <div className="flex justify-between items-center bg-dark-800 p-3 rounded-xl border border-dark-700 text-sm">
+            <span className="text-gray-400">Total em Horas</span>
+            <span className="font-bold text-white">{totalHoursNum}h</span>
+          </div>
+          <div className="flex justify-between items-center bg-dark-800 p-3 rounded-xl border border-dark-700 text-sm">
+            <span className="text-gray-400">Total em Minutos</span>
+            <span className="font-bold text-white">{totalMinutes.toLocaleString('pt-BR')} min</span>
+          </div>
+          <div className="flex justify-between items-center bg-dark-800 p-3 rounded-xl border border-dark-700 text-sm">
+            <span className="text-gray-400">Equivalência aproximada</span>
+            <span className="font-bold text-brand-400">~{moviesEquivalent} filmes (2h)</span>
+          </div>
+        </div>
+
+        <div className="p-3 bg-dark-800/40 rounded-xl border border-dark-700/40 text-xs text-gray-400 leading-relaxed">
+          💡 O tempo é calculado somando a duração de cada episódio ou filme assistido na sua conta.
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const HomePage: React.FC = () => {
+  const navigate = useNavigate();
   const { user, userProfile } = useAuth();
   const [userShows, setUserShows] = useState<UserShow[]>([]);
   const [following, setFollowing] = useState<FollowingInfo[]>([]);
+  const [episodesModalOpen, setEpisodesModalOpen] = useState(false);
+  const [watchTimeModalOpen, setWatchTimeModalOpen] = useState(false);
 
   const { data: recommendedData, isLoading: trendingLoading } = useQuery({
     queryKey: ['recommended'],
@@ -287,10 +476,30 @@ const HomePage: React.FC = () => {
 
       {/* Quick stats */}
       <div className="grid grid-cols-4 gap-3 mb-8">
-        <StatCard value={userShows.length} label="Na lista" />
-        <StatCard value={totalWatched} label="Ep. assistidos" />
-        <StatCard value={formatWatchTimeShort(totalMinutes)} label="Assistidas" />
-        <StatCard value={userShows.filter((s) => s.status === 'completed').length} label="Concluídas" />
+        <StatCard
+          value={userShows.length}
+          label="Na lista"
+          title="Clique para ir para Minha Lista"
+          onClick={() => navigate('/watchlist?tab=series')}
+        />
+        <StatCard
+          value={totalWatched}
+          label="Ep. assistidos"
+          title="Clique para ver estatísticas de episódios"
+          onClick={() => setEpisodesModalOpen(true)}
+        />
+        <StatCard
+          value={formatWatchTimeShort(totalMinutes)}
+          label="Assistidas"
+          title="Clique para ver detalhamento do tempo assistido"
+          onClick={() => setWatchTimeModalOpen(true)}
+        />
+        <StatCard
+          value={userShows.filter((s) => s.status === 'completed').length}
+          label="Concluídas"
+          title="Clique para ver séries concluídas"
+          onClick={() => navigate('/watchlist?tab=series&filter=completed')}
+        />
       </div>
 
       {/* Lists */}
@@ -421,6 +630,19 @@ const HomePage: React.FC = () => {
         saving={savingBanner}
         onClose={() => setPickerOpen(false)}
         onPick={handlePickBanner}
+      />
+
+      <WatchedEpisodesModal
+        open={episodesModalOpen}
+        onClose={() => setEpisodesModalOpen(false)}
+        shows={userShows}
+        totalWatched={totalWatched}
+      />
+
+      <WatchTimeModal
+        open={watchTimeModalOpen}
+        onClose={() => setWatchTimeModalOpen(false)}
+        totalMinutes={totalMinutes}
       />
       </div>
     </div>

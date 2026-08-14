@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -213,8 +213,17 @@ const UpNextCard = ({
 
 const WatchlistPage: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const filterParam = searchParams.get('filter') as StatusFilter | null;
+
   const [shows, setShows] = useState<UserShow[]>([]);
-  const [mainTab, setMainTab] = useState<'upnext' | 'series' | 'movies'>('upnext');
+  const [mainTab, setMainTab] = useState<'upnext' | 'series' | 'movies'>(() => {
+    if (tabParam === 'series' || tabParam === 'movies' || tabParam === 'upnext') {
+      return tabParam;
+    }
+    return 'upnext';
+  });
   const [upNext, setUpNext] = useState<UpNextItem[]>([]);
   const [recentlyWatched, setRecentlyWatched] = useState<UpNextItem[]>(() => {
     try {
@@ -230,7 +239,12 @@ const WatchlistPage: React.FC = () => {
   const [loadingUpNext, setLoadingUpNext] = useState(true);
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+    if (filterParam && ['all', 'watching', 'completed', 'dropped', 'plan_to_watch', 'up_to_date'].includes(filterParam)) {
+      return filterParam;
+    }
+    return 'all';
+  });
 
   // Cache released episodes count per show using React Query
   const getReleasedCount = async (show: UserShow): Promise<number> => {
@@ -330,7 +344,18 @@ const WatchlistPage: React.FC = () => {
   }, [user, shows]);
 
   useEffect(() => {
-    setStatusFilter('all');
+    const tab = searchParams.get('tab');
+    const filter = searchParams.get('filter') as StatusFilter | null;
+
+    if (tab === 'series' || tab === 'movies' || tab === 'upnext') {
+      setMainTab(tab);
+    }
+    if (filter && ['all', 'watching', 'completed', 'dropped', 'plan_to_watch', 'up_to_date'].includes(filter)) {
+      setStatusFilter(filter);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (mainTab === 'upnext') loadUpNext();
   }, [mainTab, loadUpNext]);
 
