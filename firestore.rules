@@ -22,6 +22,15 @@ service cloud.firestore {
         allow create, delete: if request.auth != null && request.auth.uid == userId;
       }
 
+      // ── Friends subcollection ───────────────────────────────────────────
+      // Authenticated users can read. Owner or friend can manage friendship docs.
+      match /friends/{friendId} {
+        allow read: if request.auth != null;
+        allow create, update, delete: if request.auth != null && (
+          request.auth.uid == userId || request.auth.uid == friendId
+        );
+      }
+
       // ── UserShows (subcollection) ────────────────────────────────────────
       // Only the owner or someone who follows the owner can read.
       match /userShows/{showId} {
@@ -33,7 +42,8 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly([
             'showId', 'title', 'posterPath', 'backdropPath', 'status',
             'totalEpisodes', 'totalSeasons', 'watchedCount', 'addedAt',
-            'lastWatchedAt', 'isFavorite', 'genres', 'mediaType', 'source'
+            'lastWatchedAt', 'isFavorite', 'genres', 'mediaType', 'source',
+            'lastWatchedEpisode'
           ])
           && request.resource.data.showId is string
           && request.resource.data.title is string
@@ -44,7 +54,8 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly([
             'showId', 'title', 'posterPath', 'backdropPath', 'status',
             'totalEpisodes', 'totalSeasons', 'watchedCount', 'addedAt',
-            'lastWatchedAt', 'isFavorite', 'genres', 'mediaType', 'source'
+            'lastWatchedAt', 'isFavorite', 'genres', 'mediaType', 'source',
+            'lastWatchedEpisode'
           ])
           && request.resource.data.watchedCount is int
           && request.resource.data.watchedCount >= 0;
@@ -56,7 +67,7 @@ service cloud.firestore {
           allow read: if request.auth != null && request.auth.uid == userId;
           allow create, update: if request.auth != null && request.auth.uid == userId
             && request.resource.data.keys().hasOnly([
-              'seasonNumber', 'episodeNumber', 'runtime', 'watchedAt'
+              'seasonNumber', 'episodeNumber', 'runtime', 'watchedAt', 'name'
             ])
             && request.resource.data.seasonNumber is int
             && request.resource.data.episodeNumber is int
@@ -82,6 +93,17 @@ service cloud.firestore {
         && request.resource.data.rating <= 5;
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
+    }
+
+    // ── Friend Requests (top-level) ─────────────────────────────────────────
+    match /friendRequests/{requestId} {
+      allow read: if request.auth != null && (
+        resource.data.from == request.auth.uid || resource.data.to == request.auth.uid
+      );
+      allow create: if request.auth != null && request.resource.data.from == request.auth.uid;
+      allow update, delete: if request.auth != null && (
+        resource.data.from == request.auth.uid || resource.data.to == request.auth.uid
+      );
     }
 
     // Block all other reads/writes by default (implicit deny).
