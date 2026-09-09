@@ -29,8 +29,9 @@ const UsersIcon = ({ filled }: { filled?: boolean }) => (
   </svg>
 );
 const TableIcon = ({ filled }: { filled?: boolean }) => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h18M3 9h18M3 15h18M3 21h18M3 3v18M7 3v18M11 3v18M15 3v18M21 3v18" />
+  <svg viewBox="0 0 24 24" className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" strokeWidth={filled ? 2.4 : 2}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9.3h18M3 14.6h18M9.5 9.3v10.7" />
   </svg>
 );
 
@@ -51,11 +52,11 @@ const AppLogo = () => (
 );
 
 const navItems = [
-  { to: '/', label: 'Início', Icon: HomeIcon, end: true },
-  { to: '/search', label: 'Buscar', Icon: SearchIcon },
-  { to: '/watchlist', label: 'Minha Lista', Icon: ListIcon },
-  { to: '/control-list', label: 'Lista de Controle', Icon: TableIcon },
-  { to: '/profile', label: 'Perfil', Icon: UserIcon },
+  { to: '/', label: 'Início', mobileLabel: 'Início', Icon: HomeIcon, end: true },
+  { to: '/search', label: 'Buscar', mobileLabel: 'Buscar', Icon: SearchIcon },
+  { to: '/watchlist', label: 'Minha Lista', mobileLabel: 'Lista', Icon: ListIcon },
+  { to: '/control-list', label: 'Lista de Controle', mobileLabel: 'Controle', Icon: TableIcon },
+  { to: '/profile', label: 'Perfil', mobileLabel: 'Perfil', Icon: UserIcon },
 ];
 
 const AppLayout: React.FC = () => {
@@ -210,14 +211,14 @@ const AppLayout: React.FC = () => {
 
         {/* ── Bottom Dock (mobile) ───────────────────────────── */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 glassmorphism border-t border-dark-400/50 safe-area-bottom">
-          <div className="flex items-stretch justify-around max-w-md mx-auto">
-            {navItems.map(({ to, label, Icon, end }) => (
+          <div className="flex items-start justify-around max-w-md mx-auto px-1">
+            {navItems.map(({ to, label, mobileLabel, Icon, end }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={end}
                 className={({ isActive }) =>
-                  `nav-item flex-1 py-2.5 transition-colors duration-200 ${
+                  `nav-item flex-1 min-w-0 py-2 transition-colors duration-200 ${
                     isActive ? 'text-brand-400' : 'text-gray-500 hover:text-white'
                   }`
                 }
@@ -225,7 +226,9 @@ const AppLayout: React.FC = () => {
                 {({ isActive }) => (
                   <>
                     <Icon filled={isActive} />
-                    <span className="text-[10px] font-medium mt-0.5">{label}</span>
+                    <span className="text-[10px] font-medium mt-0.5 leading-none whitespace-nowrap truncate max-w-full">
+                      {mobileLabel ?? label}
+                    </span>
                   </>
                 )}
               </NavLink>
@@ -233,7 +236,7 @@ const AppLayout: React.FC = () => {
             <NavLink
               to="/following"
               className={({ isActive }) =>
-                `nav-item flex-1 py-2.5 transition-colors duration-200 ${
+                `nav-item flex-1 min-w-0 py-2 transition-colors duration-200 ${
                   isActive ? 'text-brand-400' : 'text-gray-500 hover:text-white'
                 }`
               }
@@ -241,7 +244,9 @@ const AppLayout: React.FC = () => {
               {({ isActive }) => (
                 <>
                   <UsersIcon filled={isActive} />
-                  <span className="text-[10px] font-medium mt-0.5">Comunidade</span>
+                  <span className="text-[10px] font-medium mt-0.5 leading-none whitespace-nowrap truncate max-w-full">
+                    Comunidade
+                  </span>
                 </>
               )}
             </NavLink>
