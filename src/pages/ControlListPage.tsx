@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import {
-  getAllUserSeasonsProgress,
+  getUserShows,
+  getSeasonProgress,
   setEpisodeWatchedAt,
+  type UserShow,
   type SeasonProgress,
   type SeasonCatalogInfo,
   type ShowStatus,
@@ -39,180 +41,287 @@ const STATUS_STYLES: Record<ShowStatus, string> = {
 
 const ITEMS_PER_PAGE = 10;
 
+const getTime = (val: unknown): number => {
+  if (!val) return 0;
+  if (typeof (val as { toDate?: unknown }).toDate === 'function') {
+    return (val as { toDate: () => Date }).toDate().getTime();
+  }
+  if (val instanceof Date) return val.getTime();
+  const parsed = new Date(val as string).getTime();
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+// Shows eligible for a filter, using only the lightweight userShows docs
+// (no episode reads) so candidates are known before loading any seasons.
+const filterShowsForTab = (shows: UserShow[], filter: FilterType): UserShow[] => {
+  if (filter === 'watching') return shows.filter((s) => s.status === 'watching');
+  if (filter === 'completed') return shows.filter((s) => s.status === 'completed');
+  // Only watching shows can be up to date.
+  if (filter === 'up_to_date') return shows.filter((s) => s.status === 'watching');
+  return shows;
+};
+
+const applySeasonFilter = (seasons: SeasonProgress[], filter: FilterType): SeasonProgress[] => {
+  return seasons.filter((season) => {
+    if (filter === 'all') return true;
+    if (filter === 'watching') return season.showStatus === 'watching';
+    if (filter === 'completed') return season.showStatus === 'completed';
+    if (filter === 'up_to_date') return season.showIsUpToDate;
+    return true;
+  });
+};
+
 const ControlListPage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
-  const [seasons, setSeasons] = useState<SeasonProgress[]>([]);
+
   const [filter, setFilter] = useState<FilterType>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [editingSeason, setEditingSeason] = useState<SeasonProgress | null>(null);
   const [editField, setEditField] = useState<'start' | 'end'>('end');
   const [editDate, setEditDate] = useState<Date | null>(null);
 
-  const fetchSeasons = useCallback(async () => {
-    if (!user) return [];
-    const base = await getAllUserSeasonsProgress(user.uid);
-
-    // Enrich with the real per-season episode totals AND released counts from
-    // TMDB/TVMaze. The show-level "released" total covers ALL seasons (like
-    // Minha Lista does), so the status badge is identical to Minha Lista.
-    // Failures fall back to the estimate already present in each SeasonProgress.
-    const now = new Date();
-    const showIds = [...new Set(base.map((s) => s.showId))];
-    const catalogs = await Promise.all(
-      showIds.map(async (showId) => {
-        const sample = base.find((s) => s.showId === showId)!;
-        const catalog = new Map<number, SeasonCatalogInfo>();
-        let catalogOk = false;
-        try {
-          if (sample.source === 'tvmaze') {
-            const all = await tvmazeGetAllEpisodes(Number(showId));
-            const bySeason = new Map<number, { total: number; released: number }>();
-            all.forEach((e) => {
-              const entry = bySeason.get(e.season_number) ?? { total: 0, released: 0 };
-              entry.total += 1;
-              if (e.air_date && new Date(e.air_date) <= now) entry.released += 1;
-              bySeason.set(e.season_number, entry);
-            });
-            bySeason.forEach(({ total, released }, seasonNumber) => {
-              catalog.set(seasonNumber, { totalEpisodes: total, releasedEpisodes: released });
-            });
-            catalogOk = true;
-          } else {
-            const details = await getTVShowDetails(Number(showId));
-            const seasonNumbers = (details.seasons ?? [])
-              .map((s) => s.season_number)
-              .filter((n) => n > 0);
-            const infos = await Promise.all(
-              seasonNumbers.map(async (seasonNumber) => {
-                try {
-                  const season = await getTVSeason(Number(showId), seasonNumber);
-                  const episodes = season.episodes ?? [];
-                  return {
-                    seasonNumber,
-                    info: {
-                      totalEpisodes: episodes.length,
-                      releasedEpisodes: episodes.filter(
-                        (e) => e.air_date && new Date(e.air_date) <= now
-                      ).length,
-                      name: season.name,
-                    } as SeasonCatalogInfo,
-                  };
-                } catch (err) {
-                  console.error(
-                    `Erro ao buscar temporada ${seasonNumber} da série ${showId}:`,
-                    err
-                  );
-                  return null;
-                }
-              })
-            );
-            infos.forEach((entry) => {
-              if (entry) catalog.set(entry.seasonNumber, entry.info);
-            });
-            catalogOk = infos.some((entry) => entry !== null);
-          }
-        } catch (err) {
-          console.error(`Erro ao buscar catálogo da série ${showId}:`, err);
-        }
-        return { showId, catalog, catalogOk };
-      })
-    );
-
-    const byShow = new Map(catalogs.map((c) => [c.showId, c]));
-    // Show-level released total (all seasons) + watched total, exactly like
-    // the "Em dia" check in Minha Lista.
-    const showStats = new Map<string, { released: number; watched: number; total: number; ok: boolean }>();
-    showIds.forEach((showId) => {
-      const seasonsOfShow = base.filter((s) => s.showId === showId);
-      const entry = byShow.get(showId);
-      let released = 0;
-      entry?.catalog.forEach((info) => {
-        released += info.releasedEpisodes ?? 0;
-      });
-      const watched = seasonsOfShow.reduce((sum, s) => sum + s.watchedEpisodes, 0);
-      const total = seasonsOfShow[0]?.showTotalEpisodes ?? 0;
-      // Same fallback as Minha Lista: if the API fails, released = total.
-      if (!entry?.catalogOk) released = total;
-      showStats.set(showId, { released, watched, total, ok: !!entry?.catalogOk });
-    });
-
-    // Latest season per show (highest season number in the catalog;
-    // falls back to the highest watched season when the API fails).
-    const latestSeasonByShow = new Map<string, number>();
-    showIds.forEach((showId) => {
-      const keys = [...(byShow.get(showId)?.catalog.keys() ?? [])];
-      if (keys.length > 0) {
-        latestSeasonByShow.set(showId, Math.max(...keys));
-      } else {
-        const watchedSeasons = base.filter((s) => s.showId === showId).map((s) => s.seasonNumber);
-        if (watchedSeasons.length > 0) {
-          latestSeasonByShow.set(showId, Math.max(...watchedSeasons));
-        }
-      }
-    });
-
-    const enriched = base.map((s) => {
-      const info = byShow.get(s.showId)?.catalog.get(s.seasonNumber);
-      const stats = showStats.get(s.showId)!;
-      const totalEpisodes = info?.totalEpisodes ?? s.totalEpisodes;
-      const releasedEpisodes = info?.releasedEpisodes ?? s.releasedEpisodes;
-      const isCompleted = s.watchedEpisodes >= totalEpisodes && totalEpisodes > 0;
-      const showIsUpToDate =
-        s.showStatus === 'watching' && stats.released > 0 && stats.watched >= stats.released;
-      return {
-        ...s,
-        totalEpisodes,
-        releasedEpisodes,
-        seasonName: info?.name ?? s.seasonName,
-        isCompleted,
-        isUpToDate: releasedEpisodes > 0 && s.watchedEpisodes >= releasedEpisodes,
-        showReleasedEpisodes: stats.released,
-        showIsUpToDate,
-        isLatestSeason: latestSeasonByShow.get(s.showId) === s.seasonNumber,
-      };
-    });
-
-    // Most recently edited first (same ordering as Up Next).
-    enriched.sort((a, b) => {
-      const ta = a.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : 0;
-      const tb = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
-      return tb - ta;
-    });
-
-    return enriched;
-  }, [user]);
-
-  const { data: fetchedSeasons, isLoading: queryLoading, isError: queryError } = useQuery({
-    queryKey: ['userSeasonsProgress', user?.uid],
-    queryFn: fetchSeasons,
+  // ── Step 1 (lightweight): load only the user's show list, ordered by most
+  // recently watched. No episodes or API calls here.
+  const {
+    data: showsBase = [],
+    isLoading: showsLoading,
+    isError: showsError,
+    refetch: refetchShows,
+  } = useQuery({
+    queryKey: ['controlShows', user?.uid],
+    queryFn: async (): Promise<UserShow[]> => {
+      if (!user) return [];
+      const shows = await getUserShows(user.uid);
+      return shows
+        .filter((s) => s.mediaType !== 'movie' && s.watchedCount > 0)
+        .sort((a, b) => getTime(b.lastWatchedAt) - getTime(a.lastWatchedAt));
+    },
     enabled: !!user,
-    staleTime: 30000,
+    staleTime: 60000,
   });
 
-  useEffect(() => {
-    if (fetchedSeasons) {
-      setSeasons(fetchedSeasons);
-      setCurrentPage(1);
-    }
-  }, [fetchedSeasons]);
+  // ── Step 2 (on demand): per-show season cache. Only the shows needed to
+  // fill the current page are loaded; the rest load when their page is opened.
+  const cacheRef = React.useRef<Record<string, SeasonProgress[]>>({});
+  const doneRef = React.useRef<Set<string>>(new Set());
+  const reqIdRef = React.useRef(0);
+  const [tick, setTick] = useState(0);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [filterExhausted, setFilterExhausted] = useState(false);
 
-  const filteredSeasons = useMemo(() => {
-    return seasons.filter((season) => {
-      if (filter === 'all') return true;
-      if (filter === 'watching') return season.showStatus === 'watching';
-      if (filter === 'completed') return season.showStatus === 'completed';
-      if (filter === 'up_to_date') return season.showIsUpToDate;
-      return true;
+  // Per-show catalog from TMDB/TVMaze (totals, names and released counts for
+  // ALL seasons, like Minha Lista does for the "Em dia" check).
+  const getShowSeasonCatalog = useCallback(
+    async (show: UserShow): Promise<{ catalog: Map<number, SeasonCatalogInfo>; catalogOk: boolean }> => {
+      const catalog = new Map<number, SeasonCatalogInfo>();
+      const now = new Date();
+      try {
+        if (show.source === 'tvmaze') {
+          const all = await tvmazeGetAllEpisodes(Number(show.showId));
+          all.forEach((e) => {
+            const entry = catalog.get(e.season_number) ?? { totalEpisodes: 0, releasedEpisodes: 0 };
+            entry.totalEpisodes += 1;
+            if (e.air_date && new Date(e.air_date) <= now) {
+              entry.releasedEpisodes = (entry.releasedEpisodes ?? 0) + 1;
+            }
+            catalog.set(e.season_number, entry);
+          });
+          return { catalog, catalogOk: true };
+        }
+        const details = await getTVShowDetails(Number(show.showId));
+        const seasonNumbers = (details.seasons ?? [])
+          .map((s) => s.season_number)
+          .filter((n) => n > 0);
+        const infos = await Promise.all(
+          seasonNumbers.map(async (seasonNumber) => {
+            try {
+              const season = await getTVSeason(Number(show.showId), seasonNumber);
+              const episodes = season.episodes ?? [];
+              return {
+                seasonNumber,
+                info: {
+                  totalEpisodes: episodes.length,
+                  releasedEpisodes: episodes.filter(
+                    (e) => e.air_date && new Date(e.air_date) <= now
+                  ).length,
+                  name: season.name,
+                } as SeasonCatalogInfo,
+              };
+            } catch (err) {
+              console.error(
+                `Erro ao buscar temporada ${seasonNumber} da série ${show.showId}:`,
+                err
+              );
+              return null;
+            }
+          })
+        );
+        infos.forEach((entry) => {
+          if (entry) catalog.set(entry.seasonNumber, entry.info);
+        });
+        return { catalog, catalogOk: infos.some((entry) => entry !== null) };
+      } catch (err) {
+        console.error(`Erro ao buscar catálogo da série ${show.showId}:`, err);
+        return { catalog, catalogOk: false };
+      }
+    },
+    []
+  );
+
+  // Load + enrich all watched seasons of a single show.
+  const loadShowSeasons = useCallback(
+    async (uid: string, show: UserShow): Promise<SeasonProgress[]> => {
+      const showId = String(show.showId);
+      const base = await getSeasonProgress(uid, Number(showId), show);
+      const { catalog, catalogOk } = await getShowSeasonCatalog(show);
+
+      let released = 0;
+      catalog.forEach((info) => {
+        released += info.releasedEpisodes ?? 0;
+      });
+      const watched = base.reduce((sum, s) => sum + s.watchedEpisodes, 0);
+      // Same fallback as Minha Lista: if the API fails, released = total.
+      if (!catalogOk) released = show.totalEpisodes || 0;
+      const showIsUpToDate =
+        show.status === 'watching' && released > 0 && watched >= released;
+
+      const catalogKeys = [...catalog.keys()];
+      const latestSeason =
+        catalogKeys.length > 0
+          ? Math.max(...catalogKeys)
+          : base.length > 0
+            ? Math.max(...base.map((s) => s.seasonNumber))
+            : null;
+
+      const enriched = base.map((s) => {
+        const info = catalog.get(s.seasonNumber);
+        const totalEpisodes = info?.totalEpisodes ?? s.totalEpisodes;
+        const releasedEpisodes = info?.releasedEpisodes ?? s.releasedEpisodes;
+        const isCompleted = s.watchedEpisodes >= totalEpisodes && totalEpisodes > 0;
+        return {
+          ...s,
+          totalEpisodes,
+          releasedEpisodes,
+          seasonName: info?.name ?? s.seasonName,
+          isCompleted,
+          isUpToDate: releasedEpisodes > 0 && s.watchedEpisodes >= releasedEpisodes,
+          showReleasedEpisodes: released,
+          showIsUpToDate,
+          isLatestSeason: latestSeason === s.seasonNumber,
+        };
+      });
+
+      // Most recently edited first (same ordering as Up Next).
+      enriched.sort((a, b) => getTime(b.lastWatchedAt) - getTime(a.lastWatchedAt));
+      return enriched;
+    },
+    [getShowSeasonCatalog]
+  );
+
+  const candidateShows = useMemo(
+    () => filterShowsForTab(showsBase, filter),
+    [showsBase, filter]
+  );
+
+  // All seasons loaded so far for the current filter, most recent first.
+  const rows = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    void tick;
+    const collected: SeasonProgress[] = [];
+    candidateShows.forEach((show) => {
+      const cached = cacheRef.current[String(show.showId)];
+      if (cached) collected.push(...cached);
     });
-  }, [seasons, filter]);
+    const filtered = applySeasonFilter(collected, filter);
+    filtered.sort((a, b) => getTime(b.lastWatchedAt) - getTime(a.lastWatchedAt));
+    return filtered;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, candidateShows, filter, reloadToken]);
 
-  const totalPages = Math.ceil(filteredSeasons.length / ITEMS_PER_PAGE);
+  // Ensure enough rows are loaded to fill the requested page, fetching whole
+  // shows (episodes + catalog) in parallel batches only as needed.
+  useEffect(() => {
+    if (!user || showsBase.length === 0) {
+      setFilterExhausted(showsBase.length === 0);
+      return;
+    }
+    const myId = ++reqIdRef.current;
+    let cancelled = false;
+    setFilterExhausted(false);
+
+    const collect = (): SeasonProgress[] => {
+      const collected: SeasonProgress[] = [];
+      candidateShows.forEach((show) => {
+        const cached = cacheRef.current[String(show.showId)];
+        if (cached) collected.push(...cached);
+      });
+      const filtered = applySeasonFilter(collected, filter);
+      filtered.sort((a, b) => getTime(b.lastWatchedAt) - getTime(a.lastWatchedAt));
+      return filtered;
+    };
+
+    const run = async () => {
+      const needed = currentPage * ITEMS_PER_PAGE;
+      let current = collect();
+      const pending = candidateShows.filter((s) => !doneRef.current.has(String(s.showId)));
+      if (current.length >= needed || pending.length === 0) {
+        if (!cancelled && myId === reqIdRef.current) {
+          setFilterExhausted(pending.length === 0);
+          setPageLoading(false);
+        }
+        return;
+      }
+      if (!cancelled && myId === reqIdRef.current) setPageLoading(true);
+      try {
+        const BATCH = 4;
+        for (let i = 0; i < pending.length; i += BATCH) {
+          if (cancelled || myId !== reqIdRef.current) return;
+          const batch = pending.slice(i, i + BATCH);
+          const results = await Promise.all(
+            batch.map(async (show) => {
+              try {
+                return { id: String(show.showId), seasons: await loadShowSeasons(user.uid, show) };
+              } catch (err) {
+                console.error(`Erro ao carregar temporadas da série ${show.showId}:`, err);
+                return { id: String(show.showId), seasons: [] as SeasonProgress[] };
+              }
+            })
+          );
+          if (cancelled || myId !== reqIdRef.current) return;
+          results.forEach(({ id, seasons }) => {
+            cacheRef.current[id] = seasons;
+            doneRef.current.add(id);
+          });
+          setTick((t) => t + 1);
+          current = collect();
+          if (current.length >= needed) break;
+        }
+        if (!cancelled && myId === reqIdRef.current) setFilterExhausted(true);
+      } finally {
+        if (!cancelled && myId === reqIdRef.current) setPageLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, showsBase, candidateShows, filter, currentPage, reloadToken, loadShowSeasons]);
+
+  // Reset the per-user cache when switching accounts.
+  useEffect(() => {
+    cacheRef.current = {};
+    doneRef.current = new Set();
+    setTick((t) => t + 1);
+  }, [user?.uid]);
+
+  const totalPages = filterExhausted ? Math.ceil(rows.length / ITEMS_PER_PAGE) : null;
   const paginatedSeasons = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredSeasons.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredSeasons, currentPage]);
+    return rows.slice(start, start + ITEMS_PER_PAGE);
+  }, [rows, currentPage]);
 
   const updateEndDateMutation = useMutation({
     mutationFn: async ({ 
@@ -230,8 +339,12 @@ const ControlListPage: React.FC = () => {
     }) => {
       await setEpisodeWatchedAt(uid, showId, seasonNumber, episodeNumber, newDate);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userSeasonsProgress', user?.uid] });
+    onSuccess: (_data, vars) => {
+      // Drop only this show from the cache so it reloads on demand.
+      delete cacheRef.current[String(vars.showId)];
+      doneRef.current.delete(String(vars.showId));
+      queryClient.invalidateQueries({ queryKey: ['controlShows', user?.uid] });
+      setReloadToken((t) => t + 1);
       setEditingSeason(null);
       setEditDate(null);
     },
@@ -289,7 +402,9 @@ const ControlListPage: React.FC = () => {
     return STATUS_STYLES[season.showStatus];
   };
 
-  if (queryLoading) {
+  const showInitialSkeleton = showsLoading || (paginatedSeasons.length === 0 && pageLoading);
+
+  if (showsLoading) {
     return (
       <div className="p-4 md:p-6 max-w-7xl mx-auto pb-28 md:pb-0">
         <h1 className="page-title mb-6">Lista de Controle</h1>
@@ -338,18 +453,33 @@ const ControlListPage: React.FC = () => {
       </div>
 
       {/* Error */}
-      {queryError && seasons.length === 0 ? (
+      {showsError && rows.length === 0 ? (
         <div className="card p-12 text-center">
           <p className="text-white font-semibold text-lg">Não foi possível carregar a lista</p>
           <p className="text-gray-400 text-sm mt-1">Verifique sua conexão e tente novamente.</p>
           <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['userSeasonsProgress', user?.uid] })}
+            onClick={() => refetchShows()}
             className="btn-primary inline-flex mt-4"
           >
             Tentar novamente
           </button>
         </div>
-      ) : seasons.length === 0 ? (
+      ) : showInitialSkeleton ? (
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="card animate-pulse">
+              <div className="flex items-center gap-4 p-4">
+                <div className="w-14 h-20 rounded-lg bg-dark-600" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-dark-500 rounded w-1/3" />
+                  <div className="h-3 bg-dark-600 rounded w-1/4" />
+                  <div className="h-3 bg-dark-600 rounded w-1/4" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : rows.length === 0 && candidateShows.length === 0 ? (
         <div className="card p-12 text-center">
           <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-500/20 flex items-center justify-center">
             <svg viewBox="0 0 24 24" className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.5}>
@@ -362,7 +492,7 @@ const ControlListPage: React.FC = () => {
             Buscar séries
           </Link>
         </div>
-      ) : filteredSeasons.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="card p-12 text-center">
           <p className="text-gray-400 text-sm">Nenhuma temporada encontrada com este filtro.</p>
         </div>
@@ -507,30 +637,37 @@ const ControlListPage: React.FC = () => {
               </table>
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="px-4 py-3 border-t border-dark-600/50 flex items-center justify-between">
-                <p className="text-xs text-gray-400">
-                  Página {currentPage} de {totalPages} — {filteredSeasons.length} temporada{filteredSeasons.length !== 1 ? 's' : ''}
-                </p>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Anterior
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Próxima
-                  </button>
-                </div>
+            {/* Pagination — further pages load their shows on demand */}
+            <div className="px-4 py-3 border-t border-dark-600/50 flex items-center justify-between gap-3">
+              <p className="text-xs text-gray-400">
+                {pageLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 border-2 border-dark-400 border-t-brand-500 rounded-full animate-spin" />
+                    Carregando temporadas...
+                  </span>
+                ) : totalPages != null ? (
+                  <>Página {currentPage} de {totalPages} — {rows.length} temporada{rows.length !== 1 ? 's' : ''}</>
+                ) : (
+                  <>Página {currentPage} — {rows.length} temporada{rows.length !== 1 ? 's' : ''} carregada{rows.length !== 1 ? 's' : ''}</>
+                )}
+              </p>
+              <div className="flex gap-1 shrink-0">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1 || pageLoading}
+                  className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Anterior
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => (totalPages != null ? Math.min(totalPages, p + 1) : p + 1))}
+                  disabled={pageLoading || (totalPages != null && currentPage >= totalPages)}
+                  className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Próxima
+                </button>
               </div>
-            )}
+            </div>
           </div>
         </>
       )}
