@@ -9,6 +9,7 @@ const SearchPage = React.lazy(() => import('../pages/SearchPage'));
 const ShowDetailPage = React.lazy(() => import('../pages/ShowDetailPage'));
 const MovieDetailPage = React.lazy(() => import('../pages/MovieDetailPage'));
 const WatchlistPage = React.lazy(() => import('../pages/WatchlistPage'));
+const ControlListPage = React.lazy(() => import('../pages/ControlListPage'));
 const ProfilePage = React.lazy(() => import('../pages/ProfilePage'));
 const UserProfilePage = React.lazy(() => import('../pages/UserProfilePage'));
 const FollowingPage = React.lazy(() => import('../pages/FollowingPage'));
@@ -50,6 +51,7 @@ export const AppRouter = () => {
           <Route path="show/:id" element={<ShowDetailPage />} />
           <Route path="movie/:id" element={<MovieDetailPage />} />
           <Route path="watchlist" element={<WatchlistPage />} />
+          <Route path="control-list" element={<ControlListPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="user/:uid" element={<UserProfilePage />} />
           <Route path="following" element={<FollowingPage />} />

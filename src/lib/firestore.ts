@@ -292,7 +292,35 @@ export const setEpisodeWatchedAt = async (
   const showRef = doc(db, 'users', uid, 'userShows', String(showId));
   const showSnap = await getDoc(showRef);
   if (showSnap.exists()) {
-    await updateDoc(showRef, { lastWatchedAt: watchedAt });
+    // Recalculate lastWatchedAt & lastWatchedEpisode from all episodes so the
+    // other tabs (Up Next, Minha Lista) stay consistent with the edited date.
+    const allEps = await getDocs(
+      collection(db, 'users', uid, 'userShows', String(showId), 'episodes')
+    );
+    let latestWatchedAt: any = watchedAt;
+    let latestEpData: { seasonNumber: number; episodeNumber: number; name?: string } | null = {
+      seasonNumber,
+      episodeNumber,
+    };
+    allEps.docs.forEach((d) => {
+      const data = d.data();
+      const wa = data.watchedAt;
+      if (!wa) return;
+      const waTime = typeof wa.toDate === 'function' ? wa.toDate().getTime() : new Date(wa).getTime();
+      const curTime =
+        typeof latestWatchedAt?.toDate === 'function'
+          ? latestWatchedAt.toDate().getTime()
+          : new Date(latestWatchedAt).getTime();
+      if (waTime >= curTime) {
+        latestWatchedAt = wa;
+        latestEpData = { seasonNumber: data.seasonNumber, episodeNumber: data.episodeNumber, name: data.name };
+      }
+    });
+
+    await updateDoc(showRef, {
+      lastWatchedAt: latestWatchedAt,
+      lastWatchedEpisode: latestEpData,
+    });
   }
 };
 
@@ -711,6 +739,184 @@ export const subscribeToWatchedEpisodeDocs = (
       console.error('Erro ao ler episódios assistidos:', err);
     }
   );
+};
+
+// ── Season Control ──────────────────────────────────────────────────────────────
+
+export interface SeasonProgress {
+  showId: string;
+  showTitle: string;
+  posterPath: string | null;
+  seasonNumber: number;
+  seasonName: string;
+  totalEpisodes: number;
+  watchedEpisodes: number;
+  /** Episodes of this season already released (air_date <= today). 0 = unknown. */
+  releasedEpisodes: number;
+  startDate: Date | null;
+  endDate: Date | null;
+  isCompleted: boolean;
+  /** Caught up with everything released in this season. */
+  isUpToDate: boolean;
+  showStatus: ShowStatus;
+  /** Show-level fields mirroring the Minha Lista badge for this series. */
+  showTotalEpisodes: number;
+  showReleasedEpisodes: number;
+  showIsUpToDate: boolean;
+  /** True when this is the latest season of the series. */
+  isLatestSeason: boolean;
+  lastWatchedAt: Date | null;
+  source?: 'tvmaze' | 'tmdb';
+  /** Episode number of the first watched episode in this season (for start-date edits). */
+  firstEpisodeNumber: number | null;
+  /** Episode number of the most recently watched episode in this season (for end-date edits). */
+  lastEpisodeNumber: number | null;
+  lastEpisodeName?: string;
+}
+
+/** Per-season catalog info (totals/names/released) supplied by the caller from TMDB/TVMaze. */
+export interface SeasonCatalogInfo {
+  totalEpisodes: number;
+  releasedEpisodes?: number;
+  name?: string;
+}
+
+export interface SeasonEpisode {
+  episodeId: string;
+  seasonNumber: number;
+  episodeNumber: number;
+  name?: string;
+  watchedAt: Date;
+  runtime?: number;
+}
+
+export const getSeasonProgress = async (
+  uid: string,
+  showId: number,
+  showData?: UserShow,
+  catalog?: Map<number, SeasonCatalogInfo>
+): Promise<SeasonProgress[]> => {
+  let resolvedShow = showData;
+  if (!resolvedShow) {
+    const showRef = doc(db, 'users', uid, 'userShows', String(showId));
+    const showSnap = await getDoc(showRef);
+    if (!showSnap.exists()) return [];
+    resolvedShow = showSnap.data() as UserShow;
+  }
+
+  // Movies have no seasons — nothing to list.
+  if (resolvedShow.mediaType === 'movie') return [];
+
+  const episodesRef = collection(db, 'users', uid, 'userShows', String(showId), 'episodes');
+  const episodesSnap = await getDocs(episodesRef);
+
+  // Group episodes by season
+  const episodesBySeason = new Map<number, SeasonEpisode[]>();
+
+  episodesSnap.docs.forEach((d) => {
+    const data = d.data() as { seasonNumber: number; episodeNumber: number; name?: string; watchedAt?: any; runtime?: number };
+    const watchedAt = data.watchedAt ? (data.watchedAt.toDate ? data.watchedAt.toDate() : new Date(data.watchedAt)) : null;
+    if (!watchedAt) return;
+
+    const seasonNumber = data.seasonNumber;
+    if (!episodesBySeason.has(seasonNumber)) {
+      episodesBySeason.set(seasonNumber, []);
+    }
+    episodesBySeason.get(seasonNumber)!.push({
+      episodeId: d.id,
+      seasonNumber,
+      episodeNumber: data.episodeNumber,
+      name: data.name,
+      watchedAt,
+      runtime: data.runtime,
+    });
+  });
+
+  const result: SeasonProgress[] = [];
+
+  episodesBySeason.forEach((episodes, seasonNumber) => {
+    episodes.sort((a, b) => a.watchedAt.getTime() - b.watchedAt.getTime());
+
+    const catalogInfo = catalog?.get(seasonNumber);
+    // Fallback when the API catalog is unavailable: even split across seasons.
+    const totalEpisodes = catalogInfo?.totalEpisodes ??
+      Math.ceil((resolvedShow!.totalEpisodes || 0) / (resolvedShow!.totalSeasons || 1));
+    const watchedEpisodes = episodes.length;
+    const firstEp = episodes[0];
+    const startDate = firstEp?.watchedAt ?? null;
+    const lastEp = episodes[episodes.length - 1];
+    const endDate = lastEp?.watchedAt ?? null;
+    const isCompleted = watchedEpisodes >= totalEpisodes && totalEpisodes > 0;
+    const releasedEpisodes = catalogInfo?.releasedEpisodes ?? 0;
+    const isUpToDate = releasedEpisodes > 0 && watchedEpisodes >= releasedEpisodes;
+
+    result.push({
+      showId: String(showId),
+      showTitle: resolvedShow!.title,
+      posterPath: resolvedShow!.posterPath,
+      seasonNumber,
+      seasonName: catalogInfo?.name ?? `Temporada ${seasonNumber}`,
+      totalEpisodes,
+      watchedEpisodes,
+      releasedEpisodes,
+      startDate,
+      endDate,
+      isCompleted,
+      isUpToDate,
+      showStatus: resolvedShow!.status,
+      showTotalEpisodes: resolvedShow!.totalEpisodes || 0,
+      showReleasedEpisodes: 0,
+      showIsUpToDate: false,
+      isLatestSeason: false,
+      lastWatchedAt: endDate,
+      source: resolvedShow!.source,
+      firstEpisodeNumber: firstEp?.episodeNumber ?? null,
+      lastEpisodeNumber: lastEp?.episodeNumber ?? null,
+      lastEpisodeName: lastEp?.name,
+    });
+  });
+
+  // Sort by lastWatchedAt descending (most recently edited first)
+  result.sort((a, b) => {
+    const ta = a.lastWatchedAt?.getTime() ?? 0;
+    const tb = b.lastWatchedAt?.getTime() ?? 0;
+    return tb - ta;
+  });
+
+  return result;
+};
+
+export const getAllUserSeasonsProgress = async (uid: string): Promise<SeasonProgress[]> => {
+  const showsRef = collection(db, 'users', uid, 'userShows');
+  const showsSnap = await getDocs(showsRef);
+
+  const allSeasons: SeasonProgress[] = [];
+
+  for (const showDoc of showsSnap.docs) {
+    try {
+      const data = showDoc.data() as UserShow;
+      // Skip movies — the control list is season-based.
+      if (data.mediaType === 'movie') continue;
+      const showId = Number(showDoc.id);
+      if (Number.isNaN(showId)) continue;
+      // Skip shows with nothing watched (requirement: don't show empty seasons).
+      if (!data.watchedCount || data.watchedCount <= 0) continue;
+      const seasons = await getSeasonProgress(uid, showId, data);
+      allSeasons.push(...seasons);
+    } catch (err) {
+      // One failing show must not hide all the others.
+      console.error(`Erro ao buscar temporadas do show ${showDoc.id}:`, err);
+    }
+  }
+
+  // Sort by lastWatchedAt descending (most recently edited first)
+  allSeasons.sort((a, b) => {
+    const ta = a.lastWatchedAt?.getTime() ?? 0;
+    const tb = b.lastWatchedAt?.getTime() ?? 0;
+    return tb - ta;
+  });
+
+  return allSeasons;
 };
 
 // ── Friends ────────────────────────────────────────────────────────────────────

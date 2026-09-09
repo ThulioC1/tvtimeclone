@@ -28,6 +28,11 @@ const UsersIcon = ({ filled }: { filled?: boolean }) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
   </svg>
 );
+const TableIcon = ({ filled }: { filled?: boolean }) => (
+  <svg viewBox="0 0 24 24" className="w-6 h-6" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h18M3 9h18M3 15h18M3 21h18M3 3v18M7 3v18M11 3v18M15 3v18M21 3v18" />
+  </svg>
+);
 
 const AppLogo = () => (
   <svg viewBox="0 0 512 512" className="w-9 h-9" fill="none">
@@ -49,20 +54,47 @@ const navItems = [
   { to: '/', label: 'Início', Icon: HomeIcon, end: true },
   { to: '/search', label: 'Buscar', Icon: SearchIcon },
   { to: '/watchlist', label: 'Minha Lista', Icon: ListIcon },
+  { to: '/control-list', label: 'Lista de Controle', Icon: TableIcon },
   { to: '/profile', label: 'Perfil', Icon: UserIcon },
 ];
 
 const AppLayout: React.FC = () => {
   const { user, userProfile } = useAuth();
+  const [collapsed, setCollapsed] = React.useState(() => {
+    try {
+      return localStorage.getItem('sidebarCollapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      try {
+        localStorage.setItem('sidebarCollapsed', String(!prev));
+      } catch {}
+      return !prev;
+    });
+  };
 
   return (
     <div className="flex h-screen bg-dark-900 overflow-hidden">
       {/* ── Sidebar (desktop) ─────────────────────────────────────────── */}
-      <aside className="hidden md:flex flex-col w-64 bg-dark-800 border-r border-dark-500 shrink-0">
+      <aside
+        className={`hidden md:flex flex-col bg-dark-800 border-r border-dark-500 shrink-0 transition-all duration-300 ${
+          collapsed ? 'w-20' : 'w-64'
+        }`}
+      >
         {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-6 border-b border-dark-500">
+        <div
+          className={`flex items-center gap-3 py-6 border-b border-dark-500 ${
+            collapsed ? 'justify-center px-0' : 'px-6'
+          }`}
+        >
           <AppLogo />
-          <span className="text-xl font-bold gradient-text">Time to Watch</span>
+          {!collapsed && (
+            <span className="text-xl font-bold gradient-text whitespace-nowrap">Time to Watch</span>
+          )}
         </div>
 
         {/* Nav */}
@@ -72,8 +104,11 @@ const AppLayout: React.FC = () => {
               key={to}
               to={to}
               end={end}
+              title={collapsed ? label : undefined}
               className={({ isActive }) =>
-                `relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${
+                `relative flex items-center gap-3 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${
+                  collapsed ? 'justify-center px-0' : 'px-4'
+                } ${
                   isActive
                     ? 'text-white bg-white/[0.04]'
                     : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
@@ -86,7 +121,7 @@ const AppLayout: React.FC = () => {
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-brand-400" />
                   )}
                   <Icon filled={isActive} />
-                  {label}
+                  {!collapsed && label}
                 </>
               )}
             </NavLink>
@@ -95,8 +130,11 @@ const AppLayout: React.FC = () => {
           {/* Comunidade */}
           <NavLink
             to="/following"
+            title={collapsed ? 'Comunidade' : undefined}
             className={({ isActive }) =>
-              `relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${
+              `relative flex items-center gap-3 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${
+                collapsed ? 'justify-center px-0' : 'px-4'
+              } ${
                 isActive
                   ? 'text-white bg-white/[0.04]'
                   : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
@@ -109,16 +147,41 @@ const AppLayout: React.FC = () => {
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-brand-400" />
                 )}
                 <UsersIcon filled={isActive} />
-                Comunidade
+                {!collapsed && 'Comunidade'}
               </>
             )}
           </NavLink>
         </nav>
 
+        {/* Collapse toggle */}
+        <div className="px-3 pb-2">
+          <button
+            onClick={toggleCollapsed}
+            title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+            className={`w-full flex items-center gap-3 py-2.5 rounded-xl text-gray-500 hover:text-white hover:bg-white/[0.03] transition-all duration-200 text-sm font-medium ${
+              collapsed ? 'justify-center px-0' : 'px-4'
+            }`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className={`w-5 h-5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            {!collapsed && 'Recolher'}
+          </button>
+        </div>
+
         {/* User info */}
         <div className="px-4 py-4 border-t border-dark-500">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-brand-600 flex items-center justify-center overflow-hidden shrink-0">
+          <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
+            <div
+              className="w-9 h-9 rounded-full bg-brand-600 flex items-center justify-center overflow-hidden shrink-0"
+              title={collapsed ? userProfile?.displayName || user?.email || 'Usuário' : undefined}
+            >
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="avatar" className="w-full h-full object-cover" />
               ) : (
@@ -127,12 +190,14 @@ const AppLayout: React.FC = () => {
                 </span>
               )}
             </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">
-                {userProfile?.displayName || 'Usuário'}
-              </p>
-              <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-            </div>
+            {!collapsed && (
+              <div className="overflow-hidden">
+                <p className="text-sm font-medium text-white truncate">
+                  {userProfile?.displayName || 'Usuário'}
+                </p>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+              </div>
+            )}
           </div>
         </div>
       </aside>

@@ -730,12 +730,23 @@ const ShowDetailPage: React.FC = () => {
     }
   };
 
-  const handleUnmarkSeason = async (seasonNumber: number) => {
-    if (!user) return;
+  const [confirmUnmarkSeason, setConfirmUnmarkSeason] = useState<number | null>(null);
+  const [unmarkingSeason, setUnmarkingSeason] = useState(false);
+
+  const requestUnmarkSeason = (seasonNumber: number) => {
+    setConfirmUnmarkSeason(seasonNumber);
+  };
+
+  const confirmUnmarkSeasonAction = async () => {
+    if (!user || confirmUnmarkSeason == null) return;
+    setUnmarkingSeason(true);
     try {
-      await unmarkSeasonWatched(user.uid, showId, seasonNumber);
+      await unmarkSeasonWatched(user.uid, showId, confirmUnmarkSeason);
+      setConfirmUnmarkSeason(null);
     } catch (err) {
       console.error('Erro ao desmarcar temporada:', err);
+    } finally {
+      setUnmarkingSeason(false);
     }
   };
 
@@ -1038,7 +1049,7 @@ const ShowDetailPage: React.FC = () => {
                     onToggleEpisode={handleToggleEpisode}
                     onOpenEpisode={setOpenEpisode}
                     onMarkSeason={handleMarkSeason}
-                    onUnmarkSeason={handleUnmarkSeason}
+                    onUnmarkSeason={requestUnmarkSeason}
                     togglingId={togglingId}
                   />
                 )}
@@ -1062,11 +1073,44 @@ const ShowDetailPage: React.FC = () => {
                       )
                     }
                     onMarkSeason={handleMarkSeason}
-                    onUnmarkSeason={handleUnmarkSeason}
+                    onUnmarkSeason={requestUnmarkSeason}
                   />
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {confirmUnmarkSeason != null && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
+            onClick={() => !unmarkingSeason && setConfirmUnmarkSeason(null)}
+          >
+            <div
+              className="w-full sm:max-w-sm bg-dark-900 rounded-2xl p-5 border border-dark-700 shadow-2xl shadow-black relative z-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-bold text-white">Desmarcar temporada</h3>
+              <p className="text-sm text-gray-400 mt-2">
+                Deseja realmente desmarcar toda a temporada {confirmUnmarkSeason}?
+              </p>
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => setConfirmUnmarkSeason(null)}
+                  disabled={unmarkingSeason}
+                  className="btn-secondary flex-1 text-sm disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmUnmarkSeasonAction}
+                  disabled={unmarkingSeason}
+                  className="flex-1 text-sm font-medium px-4 py-2.5 rounded-xl transition-all duration-200 bg-red-600 text-white hover:bg-red-500 disabled:opacity-50"
+                >
+                  {unmarkingSeason ? 'Desmarcando...' : 'Desmarcar'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
